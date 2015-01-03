@@ -82,7 +82,7 @@ void Q2App::Setup()
 
     engineParameters_["WindowTitle"] = GetTypeName();
     engineParameters_["LogName"] = GetTypeName() + ".log";
-    engineParameters_["FullScreen"] = m_screenModeFullscreen;
+    engineParameters_["FullScreen"] = engineParameters_["FullScreen"].GetBool() && m_screenModeFullscreen;
     engineParameters_["Headless"] = false;
     engineParameters_["ResourcePaths"] = "Quake2Data;CoreData";
 
