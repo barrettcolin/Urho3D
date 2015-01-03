@@ -67,19 +67,29 @@ void Q2App::Setup()
 {
     s_instance = this;
 
-    const char *argv[] = {
-        "Quake2",
-        //"+set", "logfile", "1",
-        //"+set", "developer", "1",
-        //"+set", "sw_mode", "1",
-        //"+set", "vid_fullscreen", "0",
-        //"+set", "s_initsound", "0",
-        //"+gamemap", "q2dm5",
-    };
-    const int argc = sizeof(argv) / sizeof(argv[0]);
+    // Read Quake 2 command line from file
+    Urho3D::FileSystem *const fileSystem = GetContext()->GetSubsystem<Urho3D::FileSystem>();
+    const Urho3D::String cmdFileName = fileSystem->GetProgramDir() + "Quake2Data/CommandLine.txt";
 
-    Qcommon_Init(argc, const_cast<char**>(argv));
+    Urho3D::SharedPtr<Urho3D::File> cmdFile(new Urho3D::File(GetContext(), cmdFileName, Urho3D::FILE_READ));
+    Urho3D::String cmdLine = cmdFile->ReadLine();
+    cmdFile->Close();
 
+    // Parse (overwrites Urho3D arguments)
+    Urho3D::ParseArguments(cmdLine, false);
+
+    Urho3D::Vector<const char*> q2Args;
+    q2Args.Reserve(Urho3D::GetArguments().Size() + 1);
+    {
+        q2Args.Push(NULL);
+        for (int i = 0; i < Urho3D::GetArguments().Size(); ++i)
+            q2Args.Push(Urho3D::GetArguments()[i].CString());
+    }
+
+    // Init Quake 2
+    Qcommon_Init(q2Args.Size(), const_cast<char**>(&q2Args[0]));
+
+    // Update engine parameters
     engineParameters_["WindowTitle"] = GetTypeName();
     engineParameters_["LogName"] = GetTypeName() + ".log";
     engineParameters_["FullScreen"] = engineParameters_["FullScreen"].GetBool() && m_screenModeFullscreen;
