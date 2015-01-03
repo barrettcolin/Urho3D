@@ -217,3 +217,5 @@ endif ()
 
 # Urho3D documentation
 add_subdirectory (../Docs ${PROJECT_BINARY_DIR}/Docs)
+
+add_subdirectory (Quake2)

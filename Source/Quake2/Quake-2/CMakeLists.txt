@@ -1,0 +1,11 @@
+add_subdirectory(client)
+add_subdirectory(game)
+add_subdirectory(qcommon)
+add_subdirectory(ref_soft)
+add_subdirectory(server)
+
+if (WIN32)
+  add_library (q2platform win32/net_wins.c win32/q_shwin.c)
+else ()
+  add_library (q2platform linux/glob.c linux/glob.h linux/net_udp.c linux/q_shlinux.c)
+endif ()
