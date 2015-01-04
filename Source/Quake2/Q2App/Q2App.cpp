@@ -68,22 +68,27 @@ void Q2App::Setup()
     s_instance = this;
 
     // Read Quake 2 command line from file
-    Urho3D::FileSystem *const fileSystem = GetContext()->GetSubsystem<Urho3D::FileSystem>();
-    const Urho3D::String cmdFileName = fileSystem->GetProgramDir() + "Quake2Data/CommandLine.txt";
-
-    Urho3D::SharedPtr<Urho3D::File> cmdFile(new Urho3D::File(GetContext(), cmdFileName, Urho3D::FILE_READ));
-    Urho3D::String cmdLine = cmdFile->ReadLine();
-    cmdFile->Close();
-
-    // Parse (overwrites Urho3D arguments)
-    Urho3D::ParseArguments(cmdLine, false);
-
-    Urho3D::Vector<const char*> q2Args;
-    q2Args.Reserve(Urho3D::GetArguments().Size() + 1);
+    Urho3D::Vector<const char*> q2Args(1);
+    q2Args[0] = NULL;
     {
-        q2Args.Push(NULL);
-        for (int i = 0; i < Urho3D::GetArguments().Size(); ++i)
-            q2Args.Push(Urho3D::GetArguments()[i].CString());
+        Urho3D::FileSystem *const fileSystem = GetContext()->GetSubsystem<Urho3D::FileSystem>();
+        const Urho3D::String cmdFileName = fileSystem->GetProgramDir() + "Quake2Data/CommandLine.txt";
+
+        Urho3D::SharedPtr<Urho3D::File> cmdFile(new Urho3D::File(GetContext()));
+        if (cmdFile->Open(cmdFileName, Urho3D::FILE_READ))
+        {
+            Urho3D::String cmdLine = cmdFile->ReadLine();
+            cmdFile->Close();
+
+            // Parse (overwrites Urho3D arguments)
+            Urho3D::ParseArguments(cmdLine, false);
+
+            q2Args.Reserve(Urho3D::GetArguments().Size() + 1);
+            {
+                for (int i = 0; i < Urho3D::GetArguments().Size(); ++i)
+                    q2Args.Push(Urho3D::GetArguments()[i].CString());
+            }
+        }
     }
 
     // Init Quake 2

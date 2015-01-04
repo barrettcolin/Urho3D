@@ -17,8 +17,6 @@ extern "C"
     // Video
     refexport_t GetRefAPI(refimport_t ri);
 
-
-
     // Input
     cvar_t *in_joystick;
 
