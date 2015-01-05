@@ -151,6 +151,11 @@ void Q2App::CreateRenderScenes(int width, int height)
 
         Urho3D::Node* screenNode = m_rttScene->CreateChild();
         {
+#ifdef URHO3D_OPENGL
+            screenNode->SetPosition(Urho3D::Vector3(0.0f, 0.0f, 1.0f));
+#else
+            screenNode->SetPosition(Urho3D::Vector3(-0.5f, 0.5f, 1.0f));
+#endif
             Urho3D::StaticModel* staticModel = screenNode->CreateComponent<Urho3D::StaticModel>();
             {
                 staticModel->SetModel(screenModel);
@@ -168,12 +173,6 @@ void Q2App::CreateRenderScenes(int width, int height)
 
         Urho3D::Node* cameraNode = m_rttScene->CreateChild();
         {
-#ifdef URHO3D_OPENGL
-            cameraNode->SetPosition(Urho3D::Vector3(0.0f, 0.0f, 0.0f));
-#else
-            cameraNode->SetPosition(Urho3D::Vector3(0.5f, 0.0f, -0.5f));
-#endif
-
             Urho3D::Camera* camera = cameraNode->CreateComponent<Urho3D::Camera>();
             {
                 camera->SetOrthographic(true);
@@ -192,6 +191,13 @@ void Q2App::CreateRenderScenes(int width, int height)
 
         Urho3D::Node* screenNode = m_scene->CreateChild();
         {
+#ifdef URHO3D_OPENGL
+            screenNode->SetPosition(Urho3D::Vector3(0.0f, 0.0f, 1.0f));
+#else
+            const float xOffset = 0.5f * m_screenModeSize.x_ / graphics->GetWidth();
+            const float yOffset = 0.5f * m_screenModeSize.y_ / graphics->GetHeight();
+            screenNode->SetPosition(Urho3D::Vector3(-xOffset, yOffset, 1.0f));
+#endif
             Urho3D::StaticModel* staticModel = screenNode->CreateComponent<Urho3D::StaticModel>();
             {
                 staticModel->SetModel(screenModel);
@@ -208,12 +214,6 @@ void Q2App::CreateRenderScenes(int width, int height)
 
         Urho3D::Node* cameraNode = m_scene->CreateChild();
         {
-#ifdef URHO3D_OPENGL
-            cameraNode->SetPosition(Urho3D::Vector3(0.0f, 0.0f, 0.0f));
-#else
-            cameraNode->SetPosition(Urho3D::Vector3(0.5f, 0.0f, -0.5f));
-#endif
-
             Urho3D::Camera* camera = cameraNode->CreateComponent<Urho3D::Camera>();
             {
                 camera->SetOrthographic(true);
