@@ -1,10 +1,13 @@
 #pragma once
 
 #include "Application.h"
+#include "Timer.h"
 
 namespace Urho3D
 {
+    class BufferedSoundStream;
     class Model;
+    class Node;
     class Scene;
     class Texture2D;
 }
@@ -28,12 +31,20 @@ public:
 
     void OnRefSetPalette(unsigned char const* palette);
 
+    void OnSNDDMAInit();
+
+    void OnSNDDMAShutdown();
+
+    int OnSNDDMAGetDMAPos();
+
+    void OnSNDDMASubmit();
+
     // Application
-    void Setup() override;
+    virtual void Setup() override;
 
-    void Start() override;
+    virtual void Start() override;
 
-    void Stop() override;
+    virtual void Stop() override;
 
 protected:
     void CreateRenderScenes(int width, int height);
@@ -66,6 +77,16 @@ private:
     Urho3D::SharedPtr<Urho3D::Scene> m_rttScene;
 
     Urho3D::SharedPtr<Urho3D::Scene> m_scene;
+
+    Urho3D::Timer m_soundTimer;
+
+    Urho3D::Vector<unsigned char> m_soundBuffer;
+
+    int m_soundBufferPos;
+
+    Urho3D::SharedPtr<Urho3D::Node> m_soundNode;
+
+    Urho3D::SharedPtr<Urho3D::BufferedSoundStream> m_soundStream;
 };
 
 namespace Q2Util
