@@ -11,7 +11,6 @@ extern "C"
 extern "C"
 {
     // System
-    unsigned sys_frame_time;
     qboolean stdin_active; //<todo.cb Linux
 
     // Video
