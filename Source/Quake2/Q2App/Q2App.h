@@ -79,4 +79,6 @@ namespace Q2Util
     Urho3D::Texture2D *CreateScreenBufferTexture(Urho3D::Context *context, int width, int height);
 
     Urho3D::Model *CreateScreenBufferModel(Urho3D::Context *context, int width, int height);
+
+    int QuakeKeyForUrhoKey(int urhoKey);
 }
