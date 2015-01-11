@@ -8,6 +8,7 @@
 #include "Geometry.h"
 #include "Graphics.h"
 #include "IndexBuffer.h"
+#include "Input.h"
 #include "InputEvents.h"
 #include "Material.h"
 #include "Model.h"
@@ -24,6 +25,8 @@
 extern "C"
 {
 #include "client/client.h"
+    
+    unsigned sys_frame_time;
 }
 
 #include "DebugNew.h"
@@ -116,6 +119,9 @@ void Q2App::Start()
 
     // Create screen palette texture
     m_screenPaletteTexture = Q2Util::CreateScreenPaletteTexture(context, m_screenPaletteData);
+
+    SubscribeToEvent(Urho3D::E_KEYDOWN, HANDLER(Q2App, HandleKeyDown));
+    SubscribeToEvent(Urho3D::E_KEYUP, HANDLER(Q2App, HandleKeyUp));
 
     SubscribeToEvent(Urho3D::E_UPDATE, HANDLER(Q2App, HandleUpdate));
 
@@ -228,6 +234,24 @@ void Q2App::CreateRenderScenes(int width, int height)
     }
 }
 
+void Q2App::HandleKeyDown(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData)
+{
+    const int key = eventData[Urho3D::KeyDown::P_KEY].GetInt();
+    const unsigned time = GetSubsystem<Urho3D::Time>()->GetSystemTime();
+    const int qkey = Q2Util::QuakeKeyForUrhoKey(key);
+
+    Key_Event(qkey, qtrue, time);
+}
+
+void Q2App::HandleKeyUp(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData)
+{
+    const int key = eventData[Urho3D::KeyDown::P_KEY].GetInt();
+    const unsigned time = GetSubsystem<Urho3D::Time>()->GetSystemTime();
+    const int qkey = Q2Util::QuakeKeyForUrhoKey(key);
+
+    Key_Event(qkey, qfalse, time);
+}
+
 void Q2App::HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData)
 {
     if (m_quitRequested)
@@ -235,6 +259,14 @@ void Q2App::HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& event
         engine_->Exit();
         return;
     }
+
+    // Update client view angles
+    Urho3D::Input *const input = GetSubsystem<Urho3D::Input>();
+    cl.viewangles[YAW] -= sensitivity->value * input->GetMouseMoveX() * m_yaw->value;
+    cl.viewangles[PITCH] += sensitivity->value * input->GetMouseMoveY() * m_pitch->value;
+
+    //<todo.cb required for input
+    sys_frame_time = GetSubsystem<Urho3D::Time>()->GetSystemTime();
 
     //<todo.cb Sys_Milliseconds updates curtime; necessary for cinematics at least
     Sys_Milliseconds();
@@ -342,4 +374,62 @@ Urho3D::Model *Q2Util::CreateScreenBufferModel(Urho3D::Context *context, int wid
     }
 
     return screenModel;
+}
+
+int Q2Util::QuakeKeyForUrhoKey(int key)
+{
+    switch (key)
+    {
+    case Urho3D::KEY_SHIFT:
+    case Urho3D::KEY_RSHIFT: return K_SHIFT;
+    case Urho3D::KEY_CTRL:
+    case Urho3D::KEY_RCTRL: return K_CTRL;
+    case Urho3D::KEY_ALT:
+    case Urho3D::KEY_RALT: return K_ALT;
+
+    case Urho3D::KEY_UP: return K_UPARROW;
+    case Urho3D::KEY_DOWN: return K_DOWNARROW;
+    case Urho3D::KEY_LEFT: return K_LEFTARROW;
+    case Urho3D::KEY_RIGHT: return K_RIGHTARROW;
+
+    case Urho3D::KEY_PAGEUP: return K_PGUP;
+    case Urho3D::KEY_PAGEDOWN: return K_PGDN;
+
+    case Urho3D::KEY_ESC: return K_ESCAPE;
+    case Urho3D::KEY_TAB: return K_TAB;
+    case Urho3D::KEY_SPACE: return K_SPACE;
+    case Urho3D::KEY_BACKSPACE: return K_BACKSPACE;
+    case Urho3D::KEY_RETURN: return K_ENTER;
+
+    case Urho3D::KEY_F1:
+    case Urho3D::KEY_F2:
+    case Urho3D::KEY_F3:
+    case Urho3D::KEY_F4:
+    case Urho3D::KEY_F5:
+    case Urho3D::KEY_F6:
+    case Urho3D::KEY_F7:
+    case Urho3D::KEY_F8:
+    case Urho3D::KEY_F9:
+    case Urho3D::KEY_F10:
+    case Urho3D::KEY_F11: return (key - Urho3D::KEY_F1) + K_F1;
+
+    case Urho3D::KEY_0:
+    case Urho3D::KEY_1:
+    case Urho3D::KEY_2:
+    case Urho3D::KEY_3:
+    case Urho3D::KEY_4:
+    case Urho3D::KEY_5:
+    case Urho3D::KEY_6:
+    case Urho3D::KEY_7:
+    case Urho3D::KEY_8:
+    case Urho3D::KEY_9: return (key - Urho3D::KEY_0) + '0';
+
+        //< SDL keys not exposed in Urho
+    case SDLK_BACKQUOTE: return '~';
+    case SDLK_MINUS: return '-';
+    case SDLK_LEFTBRACKET: return '[';
+    case SDLK_RIGHTBRACKET: return ']';
+
+    default: return (key - Urho3D::KEY_A) + 'a';
+    }
 }

@@ -49,6 +49,10 @@ public:
 protected:
     void CreateRenderScenes(int width, int height);
 
+    void HandleKeyDown(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
+
+    void HandleKeyUp(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
+
     void HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
 
     void HandleExitRequested(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
@@ -96,4 +100,6 @@ namespace Q2Util
     Urho3D::Texture2D *CreateScreenBufferTexture(Urho3D::Context *context, int width, int height);
 
     Urho3D::Model *CreateScreenBufferModel(Urho3D::Context *context, int width, int height);
+
+    int QuakeKeyForUrhoKey(int urhoKey);
 }
