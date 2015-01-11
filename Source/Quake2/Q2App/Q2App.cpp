@@ -380,26 +380,23 @@ int Q2Util::QuakeKeyForUrhoKey(int key)
 {
     switch (key)
     {
-    case Urho3D::KEY_SHIFT:
-    case Urho3D::KEY_RSHIFT: return K_SHIFT;
-    case Urho3D::KEY_CTRL:
-    case Urho3D::KEY_RCTRL: return K_CTRL;
-    case Urho3D::KEY_ALT:
-    case Urho3D::KEY_RALT: return K_ALT;
+    case Urho3D::KEY_TAB: return K_TAB;
+    case Urho3D::KEY_RETURN: return K_ENTER;
+    case Urho3D::KEY_ESC: return K_ESCAPE;
+    case Urho3D::KEY_SPACE: return K_SPACE;
 
+    case Urho3D::KEY_BACKSPACE: return K_BACKSPACE;
     case Urho3D::KEY_UP: return K_UPARROW;
     case Urho3D::KEY_DOWN: return K_DOWNARROW;
     case Urho3D::KEY_LEFT: return K_LEFTARROW;
     case Urho3D::KEY_RIGHT: return K_RIGHTARROW;
 
-    case Urho3D::KEY_PAGEUP: return K_PGUP;
-    case Urho3D::KEY_PAGEDOWN: return K_PGDN;
-
-    case Urho3D::KEY_ESC: return K_ESCAPE;
-    case Urho3D::KEY_TAB: return K_TAB;
-    case Urho3D::KEY_SPACE: return K_SPACE;
-    case Urho3D::KEY_BACKSPACE: return K_BACKSPACE;
-    case Urho3D::KEY_RETURN: return K_ENTER;
+    case Urho3D::KEY_ALT:
+    case Urho3D::KEY_RALT: return K_ALT;
+    case Urho3D::KEY_CTRL:
+    case Urho3D::KEY_RCTRL: return K_CTRL;
+    case Urho3D::KEY_SHIFT:
+    case Urho3D::KEY_RSHIFT: return K_SHIFT;
 
     case Urho3D::KEY_F1:
     case Urho3D::KEY_F2:
@@ -413,6 +410,22 @@ int Q2Util::QuakeKeyForUrhoKey(int key)
     case Urho3D::KEY_F10:
     case Urho3D::KEY_F11: return (key - Urho3D::KEY_F1) + K_F1;
 
+    case Urho3D::KEY_INSERT: return K_INS;
+    case Urho3D::KEY_DELETE: return K_DEL;
+    case Urho3D::KEY_PAGEUP: return K_PGUP;
+    case Urho3D::KEY_PAGEDOWN: return K_PGDN;
+    case Urho3D::KEY_HOME: return K_HOME;
+    case Urho3D::KEY_END: return K_END;
+
+        //< SDL keys not exposed in Urho
+    case SDLK_BACKQUOTE: return '~';
+    case SDLK_MINUS: return '-';
+    case SDLK_LEFTBRACKET: return '[';
+    case SDLK_RIGHTBRACKET: return ']';
+    case SDLK_SEMICOLON: return ';';
+    case SDLK_COMMA: return ',';
+    case SDLK_PERIOD: return '.';
+
     case Urho3D::KEY_0:
     case Urho3D::KEY_1:
     case Urho3D::KEY_2:
@@ -423,12 +436,6 @@ int Q2Util::QuakeKeyForUrhoKey(int key)
     case Urho3D::KEY_7:
     case Urho3D::KEY_8:
     case Urho3D::KEY_9: return (key - Urho3D::KEY_0) + '0';
-
-        //< SDL keys not exposed in Urho
-    case SDLK_BACKQUOTE: return '~';
-    case SDLK_MINUS: return '-';
-    case SDLK_LEFTBRACKET: return '[';
-    case SDLK_RIGHTBRACKET: return ']';
 
     default: return (key - Urho3D::KEY_A) + 'a';
     }
