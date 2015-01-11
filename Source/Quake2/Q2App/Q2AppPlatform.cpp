@@ -19,13 +19,6 @@ extern "C"
 
     // Input
     cvar_t *in_joystick;
-
-    // Sound
-    qboolean SNDDMA_Init() { return qfalse; }
-    int	SNDDMA_GetDMAPos() { return 0; }
-    void SNDDMA_Shutdown() {}
-    void SNDDMA_BeginPainting() {}
-    void SNDDMA_Submit() {}
 }
 
 // System
@@ -58,7 +51,7 @@ void Sys_CopyProtect() {}
 char *Sys_GetClipboardData() { return NULL; }
 
 // Video
-refexport_t	re;
+refexport_t re;
 viddef_t viddef;
 
 void VID_Printf(int print_level, char *fmt, ...) {}
@@ -125,10 +118,3 @@ void IN_Move(usercmd_t *cmd) {}
 void IN_Activate(qboolean active) {}
 void IN_ActivateMouse() {}
 void IN_DeactivateMouse() {}
-
-// CD audio
-void CDAudio_Play(int track, qboolean looping) {}
-void CDAudio_Stop() {}
-void CDAudio_Update() {}
-int CDAudio_Init() { return 0; }
-void CDAudio_Shutdown() {}
