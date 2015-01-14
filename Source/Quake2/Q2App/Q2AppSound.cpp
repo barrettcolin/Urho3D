@@ -17,7 +17,6 @@ extern "C"
 // dma.speed=22050, dma.samplebits=16, dma.channels=2, mixahead=0.2
 // at sound dma pos = 0, paintedtime = 4410 (= 22050 * 0.2)
 // so, paintedtime is 'mono' samples
-
 namespace
 {
     const unsigned DMA_BLOCK_SIZE = 512;
@@ -33,24 +32,73 @@ static unsigned _BytesToMonoSamples(unsigned bytes, int sampleChannels, int samp
     return bytes / sampleChannels / sampleBytes;
 }
 
+Q2SoundStream::Q2SoundStream()
+: m_soundBufferPos(0)
+{
+}
+
+void Q2SoundStream::Init(unsigned bufferSizeInBytes)
+{
+    Urho3D::MutexLock lock(m_bufferMutex);
+
+    m_soundBuffer.Resize(bufferSizeInBytes);
+}
+
+void Q2SoundStream::Shutdown()
+{
+    Urho3D::MutexLock lock(m_bufferMutex);
+
+    m_soundBuffer.Resize(0);
+    m_soundBufferPos = 0;
+}
+
+int Q2SoundStream::GetSoundBufferPos() const
+{
+    Urho3D::MutexLock lock(m_bufferMutex);
+
+    return m_soundBufferPos;
+}
+
+unsigned Q2SoundStream::GetData(signed char* dest, unsigned numBytes)
+{
+    Urho3D::MutexLock lock(m_bufferMutex);
+
+    const unsigned soundBufferSize = m_soundBuffer.Size();
+    const unsigned newPos = m_soundBufferPos + numBytes;
+    const int overrun = newPos - soundBufferSize;
+    if (overrun <= 0)
+    {
+        memcpy(dest, &m_soundBuffer[m_soundBufferPos], numBytes);
+    }
+    else
+    {
+        memcpy(dest, &m_soundBuffer[m_soundBufferPos], numBytes - overrun);
+        memcpy(dest, &m_soundBuffer[0], overrun);
+    }
+
+    m_soundBufferPos = newPos % soundBufferSize;
+
+    return numBytes;
+}
+
 void Q2App::OnSNDDMAInit()
 {
     Urho3D::Context *const context = GetContext();
 
-    const int sampleBytes = dma.samplebits / 8;
-    const int bytesPerSecond = _MonoSamplesToBytes(dma.speed, dma.channels, sampleBytes);//dma.speed * dma.channels * sampleBytes;
-    m_soundBuffer.Resize(bytesPerSecond);
-
-    // Set dma values
-    dma.buffer = &m_soundBuffer[0];
-    dma.samples = m_soundBuffer.Size() / sampleBytes;
-
     // Create sound stream
-    m_soundStream = new Urho3D::BufferedSoundStream();
+    m_soundStream = new Q2SoundStream();
     {
         const bool is16Bit = (dma.samplebits == 16);
         const bool isStereo = (dma.channels == 2);
         m_soundStream->SetFormat(dma.speed, is16Bit, isStereo);
+
+        const int sampleBytes = dma.samplebits / 8;
+        const int bytesPerSecond = _MonoSamplesToBytes(dma.speed, dma.channels, sampleBytes);
+        m_soundStream->Init(bytesPerSecond);
+
+        // Set dma values
+        dma.buffer = &m_soundStream->m_soundBuffer[0];
+        dma.samples = m_soundStream->m_soundBuffer.Size() / sampleBytes;
     }
 
     // Create sound node and play
@@ -65,62 +113,23 @@ void Q2App::OnSNDDMAInit()
 
 void Q2App::OnSNDDMAShutdown()
 {
+    m_soundStream->Shutdown();
+
     m_soundNode = NULL;
     m_soundStream = NULL;
-    m_soundBuffer.Resize(0);
 }
-
-unsigned m_soundBytes = 0;
 
 int Q2App::OnSNDDMAGetDMAPos()
 {
     const unsigned sampleChannels = dma.channels;
     const unsigned sampleBytes = dma.samplebits / 8;
-    const unsigned bufferSize = m_soundBuffer.Size();
 
-    const unsigned elapsedMSec = m_soundTimer.GetMSec(false);
-    const unsigned currentSample = 0.001f * elapsedMSec * dma.speed;
-    const unsigned bufferSamples = _BytesToMonoSamples(bufferSize, sampleChannels, sampleBytes);
-
-    return currentSample % bufferSamples;
-#if 0
-    const unsigned bufferedBytes = m_soundStream->GetBufferNumBytes();
-    const unsigned bytesConsumed = m_soundBytes - bufferedBytes;
-    const unsigned bufferBytes = bytesConsumed % bufferSize;
-    const unsigned dmaPos = _BytesToMonoSamples(bufferBytes, sampleChannels, sampleBytes);
-
-    LOGINFOF("OnSNDDMAGetDMAPos %d, %d", bufferedBytes, dmaPos);
-
-    return dmaPos;
-#endif
+    const int bufferSamplePos = m_soundStream->GetSoundBufferPos();
+    return _BytesToMonoSamples(bufferSamplePos, sampleChannels, sampleBytes);
 }
 
 void Q2App::OnSNDDMASubmit()
 {
-    const unsigned sampleChannels = dma.channels;
-    const unsigned sampleBytes = dma.samplebits / 8;
-    const unsigned bufferSize = m_soundBuffer.Size();
-
-    const unsigned paintedBytes = _MonoSamplesToBytes(paintedtime, sampleChannels, sampleBytes);
-    LOGINFOF("OnSNDDMASubmit %d, %d", paintedBytes, m_soundBytes);
-
-    const unsigned bufferBytes = m_soundBytes % bufferSize;
-    const unsigned paintedBuf = paintedBytes % bufferSize;
-
-    if (paintedBuf >= bufferBytes)
-    {
-        const int numBytes = paintedBuf - bufferBytes;
-        m_soundStream->AddData(&m_soundBuffer[bufferBytes], numBytes);
-        m_soundBytes += numBytes;
-    }
-    else
-    {
-        const int numBytes = bufferSize - bufferBytes - 1;
-        m_soundStream->AddData(&m_soundBuffer[bufferBytes], numBytes);
-        m_soundBytes += numBytes;
-        m_soundStream->AddData(&m_soundBuffer[0], paintedBuf);
-        m_soundBytes += paintedBuf;
-    }
 }
 
 // Sound
@@ -142,8 +151,7 @@ qboolean SNDDMA_Init()
 
     Q2App::GetInstance().OnSNDDMAInit();
 
-    //return qtrue;
-    return qfalse;
+    return qtrue;
 }
 
 void SNDDMA_Shutdown()
