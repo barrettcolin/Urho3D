@@ -1,16 +1,38 @@
 #pragma once
 
 #include "Application.h"
+#include "Mutex.h"
+#include "SoundStream.h"
 #include "Timer.h"
 
 namespace Urho3D
 {
-    class BufferedSoundStream;
     class Model;
     class Node;
     class Scene;
     class Texture2D;
 }
+
+class Q2SoundStream : public Urho3D::SoundStream
+{
+public:
+    Q2SoundStream();
+
+    void Init(unsigned bufferSizeInBytes);
+
+    void Shutdown();
+
+    int GetSoundBufferPos() const;
+
+    // Urho3D::SoundStream
+    virtual unsigned GetData(signed char* dest, unsigned numBytes) override;
+
+    mutable Urho3D::Mutex m_bufferMutex;
+
+    Urho3D::Vector<unsigned char> m_soundBuffer;
+
+    int m_soundBufferPos;
+};
 
 class Q2App : public Urho3D::Application
 {
@@ -82,15 +104,9 @@ private:
 
     Urho3D::SharedPtr<Urho3D::Scene> m_scene;
 
-    Urho3D::Timer m_soundTimer;
-
-    Urho3D::Vector<unsigned char> m_soundBuffer;
-
-    int m_soundBufferPos;
-
     Urho3D::SharedPtr<Urho3D::Node> m_soundNode;
 
-    Urho3D::SharedPtr<Urho3D::BufferedSoundStream> m_soundStream;
+    Urho3D::SharedPtr<Q2SoundStream> m_soundStream;
 };
 
 namespace Q2Util

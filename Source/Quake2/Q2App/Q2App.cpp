@@ -40,8 +40,7 @@ Q2App::Q2App(Urho3D::Context* context)
 m_quitRequested(false),
 m_screenPaletteDirty(false),
 m_screenModeFullscreen(false),
-m_screenModeDirty(false),
-m_soundBufferPos(0)
+m_screenModeDirty(false)
 {
 }
 
