@@ -22,16 +22,16 @@ public:
 
     void Shutdown();
 
-    int GetSoundBufferPos() const;
+    int GetCurrentSample() const;
 
     // Urho3D::SoundStream
     virtual unsigned GetData(signed char* dest, unsigned numBytes) override;
 
     mutable Urho3D::Mutex m_bufferMutex;
 
-    Urho3D::Vector<unsigned char> m_soundBuffer;
+    Urho3D::Vector<unsigned char> m_dmaBuffer;
 
-    int m_soundBufferPos;
+    int m_currentSample;
 };
 
 class Q2App : public Urho3D::Application
@@ -58,6 +58,8 @@ public:
     void OnSNDDMAShutdown();
 
     int OnSNDDMAGetDMAPos();
+
+    void OnSNDDMABeginPainting();
 
     void OnSNDDMASubmit();
 
