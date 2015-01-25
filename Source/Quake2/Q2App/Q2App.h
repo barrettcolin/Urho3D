@@ -13,6 +13,7 @@ namespace Urho3D
     class Texture2D;
 }
 
+// Q2SoundDMA
 class Q2SoundStream : public Urho3D::SoundStream
 {
 public:
@@ -32,6 +33,23 @@ public:
     Urho3D::Vector<unsigned char> m_dmaBuffer;
 
     int m_currentSample;
+};
+
+// Q2Input
+typedef struct usercmd_s usercmd_t;
+
+class Q2Input : public Urho3D::Object
+{
+    OBJECT(Q2Input);
+
+public:
+    Q2Input(Urho3D::Context *context);
+
+    void Update();
+
+    void AddCommands();
+
+    void Move(usercmd_t& cmd);
 };
 
 class Q2App : public Urho3D::Application
@@ -63,6 +81,8 @@ public:
 
     void OnSNDDMASubmit();
 
+    Q2Input& GetInput() { return *m_input; }
+
     // Application
     virtual void Setup() override;
 
@@ -76,6 +96,10 @@ protected:
     void HandleKeyDown(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
 
     void HandleKeyUp(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
+
+    void HandleMouseButtonDown(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
+
+    void HandleMouseButtonUp(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
 
     void HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData);
 
@@ -109,6 +133,8 @@ private:
     Urho3D::SharedPtr<Urho3D::Node> m_soundNode;
 
     Urho3D::SharedPtr<Q2SoundStream> m_soundStream;
+
+    Urho3D::SharedPtr<Q2Input> m_input;
 };
 
 namespace Q2Util
@@ -120,4 +146,6 @@ namespace Q2Util
     Urho3D::Model *CreateScreenBufferModel(Urho3D::Context *context, int width, int height);
 
     int QuakeKeyForUrhoKey(int urhoKey);
+
+    int QuakeMouseButtonForUrhoMouseButton(int urhoMouseButton);
 }

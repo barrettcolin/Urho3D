@@ -1,4 +1,6 @@
 #include "Q2App.h"
+#include "Graphics.h"
+#include "Input.h"
 
 extern "C"
 {
@@ -12,6 +14,7 @@ extern "C"
 {
     // System
     qboolean stdin_active; //<todo.cb Linux
+    unsigned sys_frame_time; //<todo.cb required for input (held keys)
 
     // Video
     refexport_t GetRefAPI(refimport_t ri);
@@ -44,7 +47,12 @@ void *Sys_GetGameAPI(void *parms)
 void Sys_UnloadGame() {}
 char *Sys_ConsoleInput() { return NULL; }
 void Sys_ConsoleOutput(char *string) {}
-void Sys_SendKeyEvents() {}
+
+void Sys_SendKeyEvents()
+{
+    sys_frame_time = Q2App::GetInstance().GetSubsystem<Urho3D::Time>()->GetSystemTime();
+}
+
 void Sys_AppActivate() {}
 void Sys_CopyProtect() {}
 char *Sys_GetClipboardData() { return NULL; }
@@ -109,11 +117,80 @@ void VID_MenuInit() {}
 void VID_MenuDraw() {}
 const char *VID_MenuKey(int key) { return NULL; }
 
-void IN_Init() {}
-void IN_Shutdown() {}
-void IN_Commands() {}
-void IN_Frame() {}
-void IN_Move(usercmd_t *cmd) {}
-void IN_Activate(qboolean active) {}
-void IN_ActivateMouse() {}
-void IN_DeactivateMouse() {}
+void IN_Init()
+{
+    // pass
+}
+
+void IN_Shutdown()
+{
+    // pass
+}
+
+void IN_Frame()
+{
+    Q2App::GetInstance().GetInput().Update();
+}
+
+void IN_Commands()
+{
+    Q2App::GetInstance().GetInput().AddCommands();
+}
+
+void IN_Move(usercmd_t *cmd)
+{
+    Q2App::GetInstance().GetInput().Move(*cmd);
+}
+
+Q2Input::Q2Input(Urho3D::Context *context)
+    : Urho3D::Object(context)
+{
+
+}
+
+void Q2Input::Update()
+{
+    Urho3D::Input *const input = GetSubsystem<Urho3D::Input>();
+
+    // Update mouse mode
+    const Urho3D::MouseMode mouseMode = input->GetMouseMode();
+    const bool showMouse = (cl.refresh_prepped == qfalse) || (cls.key_dest == key_console || cls.key_dest == key_menu);
+    if (showMouse)
+    {
+        input->SetMouseMode(Urho3D::MM_ABSOLUTE);
+        if (!GetSubsystem<Urho3D::Graphics>()->GetFullscreen())
+        {
+            input->SetMouseVisible(true);
+        }
+    }
+    else
+    {
+        input->SetMouseMode(Urho3D::MM_WRAP);
+        input->SetMouseVisible(false);
+    }
+}
+
+void Q2Input::AddCommands()
+{
+    // Joystick goes here
+}
+
+void Q2Input::Move(usercmd_t& cmd)
+{
+    LOGINFO("Q2Input::Move");
+
+    Urho3D::Input *const input = GetSubsystem<Urho3D::Input>();
+
+    // mouseMode == MM_WRAP when game has input focus (not console, not menu)
+    const Urho3D::MouseMode mouseMode = input->GetMouseMode();
+    if (mouseMode == Urho3D::MM_WRAP)
+    {
+        const Urho3D::IntVector2& mouseMove = input->GetMouseMove();
+
+        const float yawDelta = sensitivity->value * mouseMove.x_ * m_yaw->value;
+        cl.viewangles[YAW] -= yawDelta;
+
+        const float pitchDelta = sensitivity->value * mouseMove.y_ * m_pitch->value;
+        cl.viewangles[PITCH] += pitchDelta;
+    }
+}
