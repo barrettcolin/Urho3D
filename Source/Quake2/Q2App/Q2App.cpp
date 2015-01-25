@@ -311,7 +311,7 @@ void Q2App::HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& event
     //<todo.cb Sys_Milliseconds updates curtime; necessary for cinematics at least
     Sys_Milliseconds();
 
-    const float msec = std::ceilf(eventData[Urho3D::Update::P_TIMESTEP].GetFloat() * 1000.0f);
+    const float msec = ceilf(eventData[Urho3D::Update::P_TIMESTEP].GetFloat() * 1000.0f);
     Qcommon_Frame(static_cast<int>(msec));
 
     // Update screen palette texture
