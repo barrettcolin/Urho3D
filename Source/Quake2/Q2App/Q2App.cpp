@@ -25,8 +25,8 @@
 extern "C"
 {
 #include "client/client.h"
-    
-    unsigned sys_frame_time;
+
+    extern cvar_t *cl_maxfps;
 }
 
 #include "DebugNew.h"
@@ -40,7 +40,8 @@ Q2App::Q2App(Urho3D::Context* context)
 m_quitRequested(false),
 m_screenPaletteDirty(false),
 m_screenModeFullscreen(false),
-m_screenModeDirty(false)
+m_screenModeDirty(false),
+m_input(new Q2Input(context))
 {
 }
 
@@ -101,10 +102,23 @@ void Q2App::Setup()
     // Update engine parameters
     engineParameters_["WindowTitle"] = GetTypeName();
     engineParameters_["LogName"] = GetTypeName() + ".log";
-    engineParameters_["FullScreen"] = engineParameters_["FullScreen"].GetBool() && m_screenModeFullscreen;
     engineParameters_["Headless"] = false;
     engineParameters_["ResourcePaths"] = "Quake2Data;Data;CoreData";
 
+    // if started with '-w', engineParameters_ has key "Fullscreen" with value 'false'
+    // in which case, Urho can be windowed but Quake can think it is fullscreen (vid_fullscreen 1)
+    // otherwise, defer to Quake completely (m_screenModeFullscreen)
+    if (engineParameters_.Contains("FullScreen"))
+    {
+        const bool paramsFullscreen = engineParameters_["FullScreen"].GetBool();
+        engineParameters_["FullScreen"] = paramsFullscreen && m_screenModeFullscreen;
+    }
+    else
+    {
+        engineParameters_["FullScreen"] = m_screenModeFullscreen;
+    }
+
+    // if Quake is windowed, use its screen dimensions exactly, otherwise Urho will stretch screen
     if (!m_screenModeFullscreen)
     {
         engineParameters_["WindowWidth"] = m_screenModeSize.x_;
@@ -121,6 +135,9 @@ void Q2App::Start()
 
     SubscribeToEvent(Urho3D::E_KEYDOWN, HANDLER(Q2App, HandleKeyDown));
     SubscribeToEvent(Urho3D::E_KEYUP, HANDLER(Q2App, HandleKeyUp));
+
+    SubscribeToEvent(Urho3D::E_MOUSEBUTTONDOWN, HANDLER(Q2App, HandleMouseButtonDown));
+    SubscribeToEvent(Urho3D::E_MOUSEBUTTONUP, HANDLER(Q2App, HandleMouseButtonUp));
 
     SubscribeToEvent(Urho3D::E_UPDATE, HANDLER(Q2App, HandleUpdate));
 
@@ -251,6 +268,30 @@ void Q2App::HandleKeyUp(Urho3D::StringHash eventType, Urho3D::VariantMap& eventD
     Key_Event(qkey, qfalse, time);
 }
 
+void Q2App::HandleMouseButtonDown(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData)
+{
+    const int button = eventData[Urho3D::MouseButtonDown::P_BUTTON].GetInt();
+    const unsigned time = GetSubsystem<Urho3D::Time>()->GetSystemTime();
+
+    const int qbutton = Q2Util::QuakeMouseButtonForUrhoMouseButton(button);
+    if (qbutton)
+    {
+        Key_Event(qbutton, qtrue, time);
+    }
+}
+
+void Q2App::HandleMouseButtonUp(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData)
+{
+    const int button = eventData[Urho3D::MouseButtonDown::P_BUTTON].GetInt();
+    const unsigned time = GetSubsystem<Urho3D::Time>()->GetSystemTime();
+
+    const int qbutton = Q2Util::QuakeMouseButtonForUrhoMouseButton(button);
+    if (qbutton)
+    {
+        Key_Event(qbutton, qfalse, time);
+    }
+}
+
 void Q2App::HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& eventData)
 {
     if (m_quitRequested)
@@ -259,18 +300,18 @@ void Q2App::HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& event
         return;
     }
 
-    // Update client view angles
-    Urho3D::Input *const input = GetSubsystem<Urho3D::Input>();
-    cl.viewangles[YAW] -= sensitivity->value * input->GetMouseMoveX() * m_yaw->value;
-    cl.viewangles[PITCH] += sensitivity->value * input->GetMouseMoveY() * m_pitch->value;
+    // Update Max FPS
+    {
+        Urho3D::Engine* const engine = GetSubsystem<Urho3D::Engine>();
 
-    //<todo.cb required for input
-    sys_frame_time = GetSubsystem<Urho3D::Time>()->GetSystemTime();
+        const int targetFps = Urho3D::Min(static_cast<int>(cl_maxfps->value), engine->GetMaxFps());
+        engine->SetMaxFps(targetFps);
+    }
 
     //<todo.cb Sys_Milliseconds updates curtime; necessary for cinematics at least
     Sys_Milliseconds();
 
-    const float msec = eventData[Urho3D::Update::P_TIMESTEP].GetFloat() * 1000.0f;
+    const float msec = std::ceilf(eventData[Urho3D::Update::P_TIMESTEP].GetFloat() * 1000.0f);
     Qcommon_Frame(static_cast<int>(msec));
 
     // Update screen palette texture
@@ -437,5 +478,16 @@ int Q2Util::QuakeKeyForUrhoKey(int key)
     case Urho3D::KEY_9: return (key - Urho3D::KEY_0) + '0';
 
     default: return (key - Urho3D::KEY_A) + 'a';
+    }
+}
+
+int Q2Util::QuakeMouseButtonForUrhoMouseButton(int urhoMouseButton)
+{
+    switch (urhoMouseButton)
+    {
+    case Urho3D::MOUSEB_LEFT: return K_MOUSE1;
+    case Urho3D::MOUSEB_RIGHT: return K_MOUSE2;
+    case Urho3D::MOUSEB_MIDDLE: return K_MOUSE3;
+    default: return 0;
     }
 }
