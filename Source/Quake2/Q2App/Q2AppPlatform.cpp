@@ -177,8 +177,6 @@ void Q2Input::AddCommands()
 
 void Q2Input::Move(usercmd_t& cmd)
 {
-    LOGINFO("Q2Input::Move");
-
     Urho3D::Input *const input = GetSubsystem<Urho3D::Input>();
 
     // mouseMode == MM_WRAP when game has input focus (not console, not menu)
