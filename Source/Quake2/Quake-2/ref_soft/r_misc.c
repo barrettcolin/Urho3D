@@ -21,6 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "r_local.h"
 
+#if (id386)
+#   define TransformVector_defined 1
+#endif
+
 #define NUM_MIPS	4
 
 cvar_t	*sw_mipcap;
@@ -206,8 +210,7 @@ void R_TransformFrustum (void)
 }
 
 
-#if !(defined __linux__ && defined __i386__)
-#if !id386
+#if !(TransformVector_defined)
 
 /*
 ================
@@ -221,7 +224,9 @@ void TransformVector (vec3_t in, vec3_t out)
 	out[2] = DotProduct(in,vpn);		
 }
 
-#else
+#endif
+
+#if (id386)
 
 __declspec( naked ) void TransformVector( vec3_t vin, vec3_t vout )
 {
@@ -268,7 +273,6 @@ __declspec( naked ) void TransformVector( vec3_t vin, vec3_t vout )
 	__asm ret
 }
 
-#endif
 #endif
 
 
