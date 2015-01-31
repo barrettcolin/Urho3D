@@ -1730,7 +1730,9 @@ void CL_Frame (int msec)
 	// update the screen
 	if (host_speeds->value)
 		time_before_ref = Sys_Milliseconds ();
+    rmt_BeginCPUSample(SCR_UpdateScreen);
 	SCR_UpdateScreen ();
+    rmt_EndCPUSample();
 	if (host_speeds->value)
 		time_after_ref = Sys_Milliseconds ();
 

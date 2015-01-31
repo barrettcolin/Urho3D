@@ -518,6 +518,7 @@ void R_DrawEntitiesOnList (void)
 		return;
 
 	// all bmodels have already been drawn by the edge list
+    rmt_BeginCPUSample(R_DrawEntitiesOnList__opaque);
 	for (i=0 ; i<r_newrefdef.num_entities ; i++)
 	{
 		currententity = &r_newrefdef.entities[i];
@@ -562,11 +563,13 @@ void R_DrawEntitiesOnList (void)
 			}
 		}
 	}
+    rmt_EndCPUSample();
 
 	if ( !translucent_entities )
 		return;
 
-	for (i=0 ; i<r_newrefdef.num_entities ; i++)
+    rmt_BeginCPUSample(R_DrawEntitiesOnList__translucent);
+    for (i = 0; i<r_newrefdef.num_entities; i++)
 	{
 		currententity = &r_newrefdef.entities[i];
 
@@ -607,6 +610,7 @@ void R_DrawEntitiesOnList (void)
 			}
 		}
 	}
+    rmt_EndCPUSample();
 }
 
 
@@ -887,7 +891,9 @@ void R_EdgeDrawing (void)
 		rw_time1 = Sys_Milliseconds ();
 	}
 
+    rmt_BeginCPUSample(R_RenderWorld);
 	R_RenderWorld ();
+    rmt_EndCPUSample();
 
 	if (r_dspeeds->value)
 	{
@@ -895,7 +901,9 @@ void R_EdgeDrawing (void)
 		db_time1 = rw_time2;
 	}
 
-	R_DrawBEntitiesOnList ();
+    rmt_BeginCPUSample(R_DrawBEntitiesOnList);
+    R_DrawBEntitiesOnList();
+    rmt_EndCPUSample();
 
 	if (r_dspeeds->value)
 	{
@@ -903,7 +911,9 @@ void R_EdgeDrawing (void)
 		se_time1 = db_time2;
 	}
 
-	R_ScanEdges ();
+    rmt_BeginCPUSample(R_ScanEdges);
+    R_ScanEdges();
+    rmt_EndCPUSample();
 }
 
 //=======================================================================
@@ -1001,13 +1011,21 @@ void R_RenderFrame (refdef_t *fd)
 	if (r_speeds->value || r_dspeeds->value)
 		r_time1 = Sys_Milliseconds ();
 
+    rmt_BeginCPUSample(R_SetupFrame);
 	R_SetupFrame ();
+    rmt_EndCPUSample();
 
-	R_MarkLeaves ();	// done here so we know if we're in water
+    rmt_BeginCPUSample(R_MarkLeaves);
+    R_MarkLeaves();	// done here so we know if we're in water
+    rmt_EndCPUSample();
 
-	R_PushDlights (r_worldmodel);
+    rmt_BeginCPUSample(R_PushDlights);
+    R_PushDlights(r_worldmodel);
+    rmt_EndCPUSample();
 
+    rmt_BeginCPUSample(R_EdgeDrawing);
 	R_EdgeDrawing ();
+    rmt_EndCPUSample();
 
 	if (r_dspeeds->value)
 	{
@@ -1015,7 +1033,9 @@ void R_RenderFrame (refdef_t *fd)
 		de_time1 = se_time2;
 	}
 
-	R_DrawEntitiesOnList ();
+    rmt_BeginCPUSample(R_DrawEntitiesOnList);
+    R_DrawEntitiesOnList();
+    rmt_EndCPUSample();
 
 	if (r_dspeeds->value)
 	{
@@ -1023,12 +1043,16 @@ void R_RenderFrame (refdef_t *fd)
 		dp_time1 = Sys_Milliseconds ();
 	}
 
-	R_DrawParticles ();
+    rmt_BeginCPUSample(R_DrawParticles);
+    R_DrawParticles();
+    rmt_EndCPUSample();
 
 	if (r_dspeeds->value)
 		dp_time2 = Sys_Milliseconds ();
 
-	R_DrawAlphaSurfaces();
+    rmt_BeginCPUSample(R_DrawAlphaSurfaces);
+    R_DrawAlphaSurfaces();
+    rmt_EndCPUSample();
 
 	R_SetLightLevel ();
 
