@@ -7,10 +7,12 @@ set(qcommon_CPP_FILES
   files.c
   md4.c
   net_chan.c
-  pmove.c)
+  pmove.c
+  Remotery/lib/Remotery.c)
 
 set(qcommon_H_FILES
   qcommon.h
-  qfiles.h)
+  qfiles.h
+  Remotery/lib/Remotery.h)
 
 add_library(q2common ${qcommon_CPP_FILES} ${qcommon_H_FILES})
