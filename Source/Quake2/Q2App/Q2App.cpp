@@ -146,6 +146,7 @@ void Q2App::Start()
 
 void Q2App::Stop()
 {
+    Qcommon_Shutdown();
     Com_Quit();
 }
 
