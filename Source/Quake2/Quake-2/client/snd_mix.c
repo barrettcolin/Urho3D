@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "client.h"
 #include "snd_loc.h"
 
-#if (id386)
+#if (id386vs)
 #   define S_WriteLinearBlastStereo16_defined 1
 #   define S_PaintChannelFrom8_defined 1
 #endif
@@ -63,7 +63,7 @@ void S_WriteLinearBlastStereo16 (void)
 }
 #endif
 
-#if (id386)
+#if (id386vs)
 __declspec( naked ) void S_WriteLinearBlastStereo16 (void)
 {
 	__asm {
@@ -399,7 +399,7 @@ void S_PaintChannelFrom8 (channel_t *ch, sfxcache_t *sc, int count, int offset)
 }
 #endif
 
-#if (id386)
+#if (id386vs)
 
 __declspec( naked ) void S_PaintChannelFrom8 (channel_t *ch, sfxcache_t *sc, int count, int offset)
 {
