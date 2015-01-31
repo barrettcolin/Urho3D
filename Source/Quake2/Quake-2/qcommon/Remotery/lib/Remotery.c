@@ -248,7 +248,7 @@ static rmtU64 usTimer_Get(usTimer* timer)
 
         struct timespec tv;
         clock_gettime(CLOCK_REALTIME, &tv);
-        return tv.tv_nsec - timer->counter_start;
+        return (rmtU64)((tv.tv_nsec - timer->counter_start) * 0.001);
 
     #endif
 }
