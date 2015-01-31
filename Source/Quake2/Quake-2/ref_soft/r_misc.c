@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "r_local.h"
 
-#if (id386)
+#if (id386vs)
 #   define TransformVector_defined 1
 #endif
 
@@ -226,7 +226,7 @@ void TransformVector (vec3_t in, vec3_t out)
 
 #endif
 
-#if (id386)
+#if (id386vs)
 
 __declspec( naked ) void TransformVector( vec3_t vin, vec3_t vout )
 {
