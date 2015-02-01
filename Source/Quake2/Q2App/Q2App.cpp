@@ -80,6 +80,8 @@ void Q2App::Setup()
         Com_Printf("Remotery failed to initialize\n");
     }
 
+    rmt_SetCurrentThreadName("Q2App Main");
+
     // Read Quake 2 command line from file
     Urho3D::Vector<const char*> q2Args(1);
     q2Args[0] = NULL;
