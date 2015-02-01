@@ -55,8 +55,6 @@ int		time_after_game;
 int		time_before_ref;
 int		time_after_ref;
 
-Remotery *rmt;
-
 /*
 ============================================================================
 
@@ -1404,11 +1402,6 @@ void Qcommon_Init (int argc, char **argv)
 	if (setjmp (abortframe) )
 		Sys_Error ("Error during initialization");
 
-    // Init Remotery
-    if (RMT_ERROR_NONE != rmt_CreateGlobalInstance(&rmt)) {
-        Com_Printf("Remotery failed to initialize\n");
-    }
-
 	z_chain.next = z_chain.prev = &z_chain;
 
 	// prepare enough of the subsystems to handle
@@ -1503,7 +1496,6 @@ void Qcommon_Frame (int msec)
 	if (setjmp (abortframe) )
 		return;			// an ERR_DROP was thrown
 
-    rmt_BeginCPUSample(Qcommon_Frame);
 	if ( log_stats->modified )
 	{
 		log_stats->modified = false;
@@ -1588,8 +1580,6 @@ void Qcommon_Frame (int msec)
 		Com_Printf ("all:%3i sv:%3i gm:%3i cl:%3i rf:%3i\n",
 			all, sv, gm, cl, rf);
 	}	
-
-    rmt_EndCPUSample();
 }
 
 /*
@@ -1599,6 +1589,4 @@ Qcommon_Shutdown
 */
 void Qcommon_Shutdown (void)
 {
-    // Shutdown Remotery
-    rmt_DestroyGlobalInstance(rmt);
 }

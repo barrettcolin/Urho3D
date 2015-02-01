@@ -31,6 +31,8 @@ extern "C"
 
 #include "DebugNew.h"
 
+Remotery *rmt;
+
 DEFINE_APPLICATION_MAIN(Q2App);
 
 Q2App* Q2App::s_instance;
@@ -71,6 +73,12 @@ void Q2App::OnVidCheckChanges()
 void Q2App::Setup()
 {
     s_instance = this;
+
+    // Init Remotery
+    if (rmt_CreateGlobalInstance(&rmt) != RMT_ERROR_NONE)
+    {
+        Com_Printf("Remotery failed to initialize\n");
+    }
 
     // Read Quake 2 command line from file
     Urho3D::Vector<const char*> q2Args(1);
@@ -146,8 +154,12 @@ void Q2App::Start()
 
 void Q2App::Stop()
 {
-    Qcommon_Shutdown();
     Com_Quit();
+
+    Qcommon_Shutdown();
+
+    // Shutdown Remotery
+    rmt_DestroyGlobalInstance(rmt);
 }
 
 void Q2App::CreateRenderScenes(int width, int height)
@@ -313,7 +325,9 @@ void Q2App::HandleUpdate(Urho3D::StringHash eventType, Urho3D::VariantMap& event
     Sys_Milliseconds();
 
     const float msec = ceilf(eventData[Urho3D::Update::P_TIMESTEP].GetFloat() * 1000.0f);
+    rmt_BeginCPUSample(Qcommon_Frame);
     Qcommon_Frame(static_cast<int>(msec));
+    rmt_EndCPUSample();
 
     // Update screen palette texture
     if (m_screenPaletteDirty)
