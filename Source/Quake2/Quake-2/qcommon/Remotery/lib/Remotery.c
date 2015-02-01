@@ -222,7 +222,7 @@ static void usTimer_Init(usTimer* timer)
 
         struct timespec tv;
         clock_gettime(CLOCK_REALTIME, &tv);
-        timer->counter_start = tv.tv_nsec;
+        timer->counter_start = (rmtU64)(tv.tv_sec * 1000000 + tv.tv_nsec * 0.001);
 
     #endif
 }
@@ -248,7 +248,7 @@ static rmtU64 usTimer_Get(usTimer* timer)
 
         struct timespec tv;
         clock_gettime(CLOCK_REALTIME, &tv);
-        return (rmtU64)((tv.tv_nsec - timer->counter_start) * 0.001);
+        return (rmtU64)(tv.tv_sec * 1000000 + tv.tv_nsec * 0.001) - timer->counter_start;
 
     #endif
 }
