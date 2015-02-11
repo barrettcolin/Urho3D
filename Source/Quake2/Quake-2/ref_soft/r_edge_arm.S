@@ -17,10 +17,10 @@ $sz$span: .byte 0
 .global D_FlatFillSurface
 .func D_FlatFillSurface
 D_FlatFillSurface:
-    ldr r3, [r0, +$surf$spans] /* r3 = surf->spans */
+    ldr r3, [r0, +#$surf$spans] /* r3 = surf->spans */
 
 D_FlatFillSurface_SpanLoop:
-    ldr r3, [r3, +$span$pnext] /* r3 = span->pnext */
+    ldr r3, [r3, +#$span$pnext] /* r3 = span->pnext */
     cmp r3, #0
     bne D_FlatFillSurface_SpanLoop
 
