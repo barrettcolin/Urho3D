@@ -768,7 +768,7 @@ int D_MipLevelForScale (float scale)
 	return lmiplevel;
 }
 
-#if !(D_FlatFillSurface_defined)
+
 /*
 ==============
 D_FlatFillSurface
@@ -791,7 +791,7 @@ void D_FlatFillSurface (surf_t *surf, int color)
 			pdest[u] = color;
 	}
 }
-#endif
+
 
 /*
 ==============
@@ -1081,6 +1081,32 @@ void D_DrawflatSurfaces (void)
     rmt_EndCPUSample();
 }
 
+void D_DrawflatSurfaces2(void)
+{
+    surf_t *s;
+
+    rmt_BeginCPUSample(D_DrawflatSurfaces2);
+    for (s = &surfaces[1]; s < surface_p; s++)
+    {
+        if (!s->spans)
+            continue;
+
+        d_zistepu = s->d_zistepu;
+        d_zistepv = s->d_zistepv;
+        d_ziorigin = s->d_ziorigin;
+
+        // make a stable color for each surface by taking the low
+        // bits of the msurface pointer
+#if (D_FlatFillSurface_defined)
+        D_FlatFillSurface2(s, (int)s->msurf & 0xFF);
+#else
+        D_FlatFillSurface(s, (int)s->msurf & 0xFF);
+#endif
+        D_DrawZSpans(s->spans);
+    }
+    rmt_EndCPUSample();
+}
+
 /*
 ==============
 D_DrawSurfaces
@@ -1119,7 +1145,9 @@ void D_DrawSurfaces (void)
 		}
         rmt_EndCPUSample();
 	}
-	else
+    else if (sw_drawflat->value == 2.0)
+        D_DrawflatSurfaces2();
+    else
 		D_DrawflatSurfaces ();
 
 	currententity = NULL;	//&r_worldentity;

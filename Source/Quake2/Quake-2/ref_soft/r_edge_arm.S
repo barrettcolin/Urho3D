@@ -14,9 +14,9 @@ $sz$span: .byte 0
 .section .text
 .align 2
 .arm
-.global D_FlatFillSurface
-.func D_FlatFillSurface
-D_FlatFillSurface:
+.global D_FlatFillSurface2
+.func D_FlatFillSurface2
+D_FlatFillSurface2:
     ldr r3, [r0, +#$surf$spans] /* r3 = surf->spans */
 
 D_FlatFillSurface_SpanLoop:
