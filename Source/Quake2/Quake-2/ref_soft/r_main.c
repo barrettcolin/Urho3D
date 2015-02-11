@@ -518,7 +518,6 @@ void R_DrawEntitiesOnList (void)
 		return;
 
 	// all bmodels have already been drawn by the edge list
-    rmt_BeginCPUSample(R_DrawEntitiesOnList__opaque);
 	for (i=0 ; i<r_newrefdef.num_entities ; i++)
 	{
 		currententity = &r_newrefdef.entities[i];
@@ -563,12 +562,10 @@ void R_DrawEntitiesOnList (void)
 			}
 		}
 	}
-    rmt_EndCPUSample();
 
 	if ( !translucent_entities )
 		return;
 
-    rmt_BeginCPUSample(R_DrawEntitiesOnList__translucent);
     for (i = 0; i<r_newrefdef.num_entities; i++)
 	{
 		currententity = &r_newrefdef.entities[i];
@@ -610,7 +607,6 @@ void R_DrawEntitiesOnList (void)
 			}
 		}
 	}
-    rmt_EndCPUSample();
 }
 
 
