@@ -23,4 +23,10 @@ set(refsoft_H_FILES
   anorms.h
   r_local.h)
 
-add_library(q2refsoft ${refsoft_CPP_FILES} ${refsoft_H_FILES})
+if(RASPI)
+  enable_language(ASM)
+  set(refsoft_ASM_FILES r_edge_arm.S)
+  add_definitions(-DD_FlatFillSurface_defined=1)
+endif()
+
+add_library(q2refsoft ${refsoft_CPP_FILES} ${refsoft_H_FILES} ${refsoft_ASM_FILES})

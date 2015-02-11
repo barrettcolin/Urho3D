@@ -768,7 +768,7 @@ int D_MipLevelForScale (float scale)
 	return lmiplevel;
 }
 
-
+#if !(D_FlatFillSurface_defined)
 /*
 ==============
 D_FlatFillSurface
@@ -791,7 +791,7 @@ void D_FlatFillSurface (surf_t *surf, int color)
 			pdest[u] = color;
 	}
 }
-
+#endif
 
 /*
 ==============
