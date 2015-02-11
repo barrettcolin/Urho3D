@@ -1063,6 +1063,7 @@ void D_DrawflatSurfaces (void)
 {
 	surf_t			*s;
 
+    rmt_BeginCPUSample(D_DrawflatSurfaces);
 	for (s = &surfaces[1] ; s<surface_p ; s++)
 	{
 		if (!s->spans)
@@ -1077,6 +1078,7 @@ void D_DrawflatSurfaces (void)
 		D_FlatFillSurface (s, (int)s->msurf & 0xFF);
 		D_DrawZSpans (s->spans);
 	}
+    rmt_EndCPUSample();
 }
 
 /*
@@ -1098,7 +1100,8 @@ void D_DrawSurfaces (void)
 
 	if (!sw_drawflat->value)
 	{
-		for (s = &surfaces[1] ; s<surface_p ; s++)
+        rmt_BeginCPUSample(D_DrawSurfaces);
+        for (s = &surfaces[1]; s<surface_p; s++)
 		{
 			if (!s->spans)
 				continue;
@@ -1114,6 +1117,7 @@ void D_DrawSurfaces (void)
 			else if (s->flags & SURF_DRAWTURB)
 				D_TurbulentSurf (s);
 		}
+        rmt_EndCPUSample();
 	}
 	else
 		D_DrawflatSurfaces ();
