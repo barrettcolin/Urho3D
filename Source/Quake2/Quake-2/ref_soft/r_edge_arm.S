@@ -22,12 +22,12 @@ D_FlatFillSurface2:
     push {r4, lr}
     ldr r3, [r0, +#$surf$spans] /* r3 = surf->spans */
     ldr ip, =r_screenwidth /* ip = &r_screenwidth */
+    ldr ip, [ip] /* ip = r_screenwidth */
     ldr r0, =d_viewbuffer /* r0 = &d_viewbuffer */
+    ldr r0, [r0] /* r0 = d_viewbuffer */
 D_FlatFillSurface_SpansLoop:
-    ldr r2, [r0] /* r2 = d_viewbuffer */
-    ldr lr, [ip] /* lr = r_screenwidth */
     ldr r4, [r3, +#$span$v] /* r4 = span->v */
-    mla r4, r4, lr, r2 /* r4 = span->v * r_screenwidth + d_viewbuffer */
+    mla r4, r4, ip, r0 /* r4 = span->v * r_screenwidth + d_viewbuffer */
     ldr r2, [r3, +#$span$u] /* r2 = span->u */
     ldr lr, [r3, #8] /* lr = span->count */
     add lr, r2, lr /* lr = span->u + span->count */
