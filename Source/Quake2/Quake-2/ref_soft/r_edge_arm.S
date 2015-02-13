@@ -29,7 +29,7 @@ D_FlatFillSurface_SpansLoop:
     ldr r4, [r3, +#$span$v] /* r4 = span->v */
     mla r4, r4, ip, r0 /* r4 = span->v * r_screenwidth + d_viewbuffer */
     ldr r2, [r3, +#$span$u] /* r2 = span->u */
-    ldr lr, [r3, #8] /* lr = span->count */
+    ldr lr, [r3, +#$span$count] /* lr = span->count */
     add lr, r2, lr /* lr = span->u + span->count */
 D_FlatFillSurface_SpanLoop:
     cmp lr, r2
