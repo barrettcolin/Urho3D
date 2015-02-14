@@ -38,11 +38,17 @@ Raspi SD card
 Raspi network config: edit /etc/network/interfaces on Pi
 
 `#iface eth0 inet dhcp
+
 iface eth0 inet static
+
 address 10.0.0.10
+
 netmask 255.255.255.0
+
 network 10.0.0.0
+
 broadcast 10.0.0.255
+
 gateway 10.0.0.1`
 
 Reboot Pi and you should be able to ping network/internet from the Pi
