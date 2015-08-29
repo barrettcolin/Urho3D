@@ -1,9 +1,9 @@
+#include "Urho3D/Urho3D.h"
+
 #include "Q2App.h"
 
-#include "BufferedSoundStream.h"
-#include "Log.h"
-#include "Node.h"
-#include "SoundSource.h"
+#include "Urho3D/Scene/Node.h"
+#include "Urho3D/Audio/SoundSource.h"
 
 extern "C"
 {
@@ -11,7 +11,7 @@ extern "C"
 #include "client/snd_loc.h"
 }
 
-#include "DebugNew.h"
+#include "Urho3D/DebugNew.h"
 
 Q2SoundStream::Q2SoundStream()
 : m_currentSample(0)

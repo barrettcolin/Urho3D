@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Application.h"
-#include "Mutex.h"
-#include "SoundStream.h"
-#include "Timer.h"
+#include "Urho3D/Engine/Application.h"
+#include "Urho3D/Core/Mutex.h"
+#include "Urho3D/Audio/SoundStream.h"
+#include "Urho3D/Core/Timer.h"
 
 namespace Urho3D
 {

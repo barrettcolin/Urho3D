@@ -1,6 +1,9 @@
+#include "Urho3D/Urho3D.h"
+
 #include "Q2App.h"
-#include "Graphics.h"
-#include "Input.h"
+
+#include "Urho3D/Graphics/Graphics.h"
+#include "Urho3D/Input/Input.h"
 
 extern "C"
 {
@@ -8,7 +11,7 @@ extern "C"
 #include "game/game.h"
 }
 
-#include "DebugNew.h"
+#include "Urho3D/DebugNew.h"
 
 extern "C"
 {

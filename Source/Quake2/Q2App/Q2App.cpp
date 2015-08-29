@@ -1,26 +1,28 @@
+#include "Urho3D/Urho3D.h"
+
 #include "Q2App.h"
 
-#include "BufferedSoundStream.h"
-#include "Camera.h"
-#include "CoreEvents.h"
-#include "Engine.h"
-#include "FileSystem.h"
-#include "Geometry.h"
-#include "Graphics.h"
-#include "IndexBuffer.h"
-#include "Input.h"
-#include "InputEvents.h"
-#include "Material.h"
-#include "Model.h"
-#include "Octree.h"
-#include "Renderer.h"
-#include "ResourceCache.h"
-#include "Scene.h"
-#include "StaticModel.h"
-#include "Technique.h"
-#include "Texture2D.h"
-#include "UI.h"
-#include "VertexBuffer.h"
+//#include "Urho3D/Audio/BufferedSoundStream.h"
+#include "Urho3D/Graphics/Camera.h"
+#include "Urho3D/Core/CoreEvents.h"
+#include "Urho3D/Engine/Engine.h"
+#include "Urho3D/IO/FileSystem.h"
+#include "Urho3D/Graphics/Geometry.h"
+#include "Urho3D/Graphics/Graphics.h"
+#include "Urho3D/Graphics/IndexBuffer.h"
+#include "Urho3D/Input/Input.h"
+#include "Urho3D/Input/InputEvents.h"
+#include "Urho3D/Graphics/Material.h"
+#include "Urho3D/Graphics/Model.h"
+#include "Urho3D/Graphics/Octree.h"
+#include "Urho3D/Graphics/Renderer.h"
+#include "Urho3D/Resource/ResourceCache.h"
+#include "Urho3D/Scene/Scene.h"
+#include "Urho3D/Graphics/StaticModel.h"
+#include "Urho3D/Graphics/Technique.h"
+#include "Urho3D/Graphics/Texture2D.h"
+#include "Urho3D/UI/UI.h"
+#include "Urho3D/Graphics/VertexBuffer.h"
 
 extern "C"
 {
@@ -29,7 +31,7 @@ extern "C"
     extern cvar_t *cl_maxfps;
 }
 
-#include "DebugNew.h"
+#include "Urho3D/DebugNew.h"
 
 Remotery *rmt;
 

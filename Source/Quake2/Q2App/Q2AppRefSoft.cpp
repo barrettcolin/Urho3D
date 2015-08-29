@@ -1,3 +1,5 @@
+#include "Urho3D/Urho3D.h"
+
 #include "Q2App.h"
 
 extern "C"
@@ -5,7 +7,7 @@ extern "C"
 #include "ref_soft/r_local.h"
 }
 
-#include "DebugNew.h"
+#include "Urho3D/DebugNew.h"
 
 namespace
 {
