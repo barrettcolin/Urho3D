@@ -70,7 +70,7 @@ configure*
 *.log
 *.bak
 Thumbs.db
-Bin/baseq2/*.pak
-Bin/baseq2/save
-Bin/baseq2/video
+bin/baseq2/*.pak
+bin/baseq2/save
+bin/baseq2/video
 bin/baseq2/maps.lst
