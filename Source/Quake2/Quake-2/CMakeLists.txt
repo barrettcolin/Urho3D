@@ -2,6 +2,7 @@ add_subdirectory(client)
 add_subdirectory(game)
 add_subdirectory(qcommon)
 add_subdirectory(ref_soft)
+add_subdirectory(ref_soft_reference)
 add_subdirectory(server)
 
 if (WIN32)
