@@ -15,3 +15,13 @@ Atom N270 single core @ 800Mhz ~20500us/frame (~49fps)
 
 Optimized build:
 Atom N270 single core @ 800Mhz ~13500us/frame (~74fps)
+
+Atom N270 notes:
+Set CPU frequency to 800Mhz (conky shows 800Mhz, observed frame times are consistent)-
+echo 800000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+echo 800000 > /sys/devices/system/cpu/cpu1/cpufreq/scaling_max_freq
+
+Have to do cpu1 also, otherwise times are reported as though running at scaling_max_freq for cpu1 (1600000)
+
+Disable cpu1 (not much difference apparent with -nosound):
+echo 0 > /sys/devices/system/cpu/cpu1/online
