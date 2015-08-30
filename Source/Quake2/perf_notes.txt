@@ -1,0 +1,17 @@
+Tests conducted with:
+
+Quake2Data/CommandLine.txt:
++set sw_mode 2 // 512x384
++set cl_maxfps 200 // try not to time busy-waits
++map q2dm5
+
+Urho3D:
+-w -x 512 -y 384 // on desktop
+-nosound // on desktop + RPi
+
+Reference build:
+Raspberry Pi ARMv6 @ 800Mhz ~32000us/frame (~31fps)
+Atom N270 single core @ 800Mhz ~20500us/frame (~49fps)
+
+Optimized build:
+Atom N270 single core @ 800Mhz ~13500us/frame (~74fps)
