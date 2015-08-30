@@ -221,7 +221,7 @@ static void usTimer_Init(usTimer* timer)
     #elif defined(RMT_PLATFORM_LINUX)
 
         struct timespec tv;
-        clock_gettime(CLOCK_REALTIME, &tv);
+        clock_gettime(g_Settings.clk_id, &tv);
         timer->counter_start = (rmtU64)(tv.tv_sec * 1000000 + tv.tv_nsec * 0.001);
 
     #endif
@@ -247,7 +247,7 @@ static rmtU64 usTimer_Get(usTimer* timer)
     #elif defined(RMT_PLATFORM_LINUX)
 
         struct timespec tv;
-        clock_gettime(CLOCK_REALTIME, &tv);
+        clock_gettime(g_Settings.clk_id, &tv);
         return (rmtU64)(tv.tv_sec * 1000000 + tv.tv_nsec * 0.001) - timer->counter_start;
 
     #endif
@@ -4098,6 +4098,11 @@ rmtSettings* _rmt_Settings(void)
         g_Settings.malloc = CRTMalloc;
         g_Settings.free = CRTFree;
         g_Settings.logFilename = "rmtLog.txt";
+#if defined(RMT_PLATFORM_LINUX)
+        g_Settings.clk_id = (sysconf(_SC_NPROCESSORS_ONLN) == 1) ? CLOCK_THREAD_CPUTIME_ID : CLOCK_MONOTONIC;
+#else
+        g_Settings.clk_id = -1;
+#endif
 
         g_SettingsInitialized = RMT_TRUE;
     }

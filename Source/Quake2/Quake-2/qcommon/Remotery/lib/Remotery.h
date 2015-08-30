@@ -295,6 +295,9 @@ typedef struct rmtSettings
     void* mm_context;
     
     rmtPStr logFilename;
+
+    // clock id to use for clock_gettime on Linux
+    int clk_id;
 } rmtSettings;
 
 
