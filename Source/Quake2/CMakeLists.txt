@@ -7,3 +7,4 @@ include_directories (${URHO3D_INCLUDE_DIRS})
 
 add_subdirectory(Quake-2)
 add_subdirectory(Q2App)
+add_subdirectory(Q2AppReference)

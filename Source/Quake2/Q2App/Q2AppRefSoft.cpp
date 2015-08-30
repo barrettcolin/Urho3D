@@ -101,6 +101,7 @@ void SWimp_SetPalette(const unsigned char *palette)
     Q2App::GetInstance().OnRefSetPalette(palette);
 }
 
+#if !defined(WIN32)
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -119,4 +120,4 @@ void Sys_MakeCodeWriteable(unsigned long startaddr, unsigned long length)
     if(r < 0)
          Sys_Error("Protection change failed\n");
 }
-
+#endif
