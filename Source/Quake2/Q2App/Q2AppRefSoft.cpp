@@ -100,3 +100,23 @@ void SWimp_SetPalette(const unsigned char *palette)
 {
     Q2App::GetInstance().OnRefSetPalette(palette);
 }
+
+#include <sys/mman.h>
+#include <unistd.h>
+
+void Sys_MakeCodeWriteable(unsigned long startaddr, unsigned long length)
+{
+    int r;
+    unsigned long addr;
+    int psize = getpagesize();
+
+    addr = (startaddr & ~(psize-1)) - psize;
+
+    //fprintf(stderr, "writable code %lx(%lx)-%lx, length=%lx\n", startaddr, addr, startaddr+length, length);
+
+    r = mprotect((char*)addr, length + startaddr - addr + psize, 7);
+
+    if(r < 0)
+         Sys_Error("Protection change failed\n");
+}
+
