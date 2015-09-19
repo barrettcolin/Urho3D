@@ -1076,7 +1076,9 @@ void S_Update(vec3_t origin, vec3_t forward, vec3_t right, vec3_t up)
 	}
 
 // mix some sound
+    rmt_BeginCPUSample(S_Update_);
 	S_Update_();
+    rmt_EndCPUSample();
 }
 
 void GetSoundtime(void)

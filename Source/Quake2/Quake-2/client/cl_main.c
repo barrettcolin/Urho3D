@@ -1737,7 +1737,9 @@ void CL_Frame (int msec)
 		time_after_ref = Sys_Milliseconds ();
 
 	// update audio
+    rmt_BeginCPUSample(S_Update);
 	S_Update (cl.refdef.vieworg, cl.v_forward, cl.v_right, cl.v_up);
+    rmt_EndCPUSample();
 	
 	CDAudio_Update();
 
