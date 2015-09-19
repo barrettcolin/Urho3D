@@ -1589,4 +1589,5 @@ Qcommon_Shutdown
 */
 void Qcommon_Shutdown (void)
 {
+    Z_FreeTags(0);
 }
