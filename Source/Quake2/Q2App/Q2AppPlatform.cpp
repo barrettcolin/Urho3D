@@ -11,6 +11,8 @@ extern "C"
 #include "game/game.h"
 }
 
+#include "Quake2_Refresh.h"
+
 #include "Urho3D/DebugNew.h"
 
 extern "C"
@@ -113,7 +115,7 @@ void VID_Shutdown()
 
 void VID_CheckChanges()
 {
-    Q2App::GetInstance().OnVidCheckChanges();
+    g_refresh->OnVidCheckChanges();
 }
 
 void VID_MenuInit() {}
