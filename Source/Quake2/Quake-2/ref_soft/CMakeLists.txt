@@ -5,6 +5,7 @@ if(UNIX)
   add_definitions(-DELF)
 
   set(refsoft_ASM_FILES
+    ../linux/qasm.h
     ../linux/d_polysa.S
     ../linux/r_aclipa.S
     ../linux/r_draw16.S
@@ -17,7 +18,21 @@ if(UNIX)
     ../linux/sys_dosa.S
   )
 else()
-  add_definitions(-DC_ONLY)
+  enable_language(ASM_MASM)
+  set(refsoft_ASM_FILES
+    d_if.inc
+    qasm.inc
+    r_polysa.asm
+    r_aclipa.asm
+    r_draw16.asm
+    r_drawa.asm
+    r_edgea.asm
+    r_scana.asm
+    r_spr8.asm
+    r_surf8.asm
+    r_varsa.asm
+  )
+  set_source_files_properties(${refsoft_ASM_FILES} PROPERTIES COMPILE_FLAGS /safeseh)
 endif()
 
 set(refsoft_C_FILES
