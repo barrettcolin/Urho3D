@@ -25,6 +25,8 @@ Raspi root
 * sudo losetup -d /dev/loop0
 * sudo nano /home/user/raspi-nfsroot/etc/fstab and comment out line that mounts '/' from SD card
 
+Or, probably better, write the image to SD card, do initial config on the Pi then put card in a PC and do the 'cp -rav' from the partition on the card
+
 PC NFS
 * set up NFS (instructions for Debian: https://wiki.debian.org/NFSServerSetup)
 * add Raspi root export (to /etc/exports): `/home/user/raspi-nfsroot 10.0.0.10(rw,sync,no_root_squash,no_subtree_check)`
@@ -37,18 +39,17 @@ Raspi SD card
 
 Raspi network config: edit /etc/network/interfaces on Pi
 
-`#iface eth0 inet dhcp
+    #iface eth0 inet dhcp
+    iface eth0 inet static
+    address 10.0.0.10
+    netmask 255.255.255.0
+    network 10.0.0.0
+    broadcast 10.0.0.255
+    gateway 10.0.0.1
 
-iface eth0 inet static
+On recent Raspbian (e.g. 2015-05-05), resolvconf seems to get in the way. Either remove it or try:
 
-address 10.0.0.10
-
-netmask 255.255.255.0
-
-network 10.0.0.0
-
-broadcast 10.0.0.255
-
-gateway 10.0.0.1`
+    echo "nameserver 192.168.1.1
+    nameserver 0.0.0.0" | sudo resolvconf -a eth0.inet
 
 Reboot Pi and you should be able to ping network/internet from the Pi
