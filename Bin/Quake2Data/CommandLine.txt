@@ -1,0 +1,1 @@
++set s_loadas8bit 0 +set s_khz 22 +set s_mixahead 0.1
