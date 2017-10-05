@@ -97,6 +97,9 @@ void Sample::Start()
     SubscribeToEvent(E_KEYUP, URHO3D_HANDLER(Sample, HandleKeyUp));
     // Subscribe scene update event
     SubscribeToEvent(E_SCENEUPDATE, URHO3D_HANDLER(Sample, HandleSceneUpdate));
+
+    // Register VR subsystem
+    context_->RegisterSubsystem(new VR(context_));
     // Subscribe begin rendering event
     SubscribeToEvent(E_BEGINRENDERING, URHO3D_HANDLER(Sample, HandleBeginRendering));
     // Subscribe end rendering event

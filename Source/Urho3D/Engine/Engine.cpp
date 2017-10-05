@@ -178,8 +178,6 @@ bool Engine::Initialize(const VariantMap& parameters)
     {
         context_->RegisterSubsystem(new Graphics(context_));
         context_->RegisterSubsystem(new Renderer(context_));
-
-        context_->RegisterSubsystem(new VR(context_));
     }
     else
     {
