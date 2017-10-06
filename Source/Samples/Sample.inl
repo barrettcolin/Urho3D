@@ -46,7 +46,6 @@
 
 Sample::Sample(Context* context) :
     Application(context),
-    vrData_(0),
     yaw_(0.0f),
     pitch_(0.0f),
     touchEnabled_(false),
@@ -97,21 +96,13 @@ void Sample::Start()
     SubscribeToEvent(E_KEYUP, URHO3D_HANDLER(Sample, HandleKeyUp));
     // Subscribe scene update event
     SubscribeToEvent(E_SCENEUPDATE, URHO3D_HANDLER(Sample, HandleSceneUpdate));
-
-    // Register VR subsystem
-    context_->RegisterSubsystem(new VR(context_));
-    // Subscribe begin rendering event
-    SubscribeToEvent(E_BEGINRENDERING, URHO3D_HANDLER(Sample, HandleBeginRendering));
-    // Subscribe end rendering event
-    SubscribeToEvent(E_ENDRENDERING, URHO3D_HANDLER(Sample, HandleEndRendering));
+    // Subscribe end frame event
+    SubscribeToEvent(E_ENDFRAME, URHO3D_HANDLER(Sample, HandleEndFrame));
 }
 
 void Sample::Stop()
 {
     engine_->DumpResources(true);
-
-    delete vrData_;
-    vrData_ = 0;
 }
 
 void Sample::InitTouchInput()
@@ -399,66 +390,6 @@ void Sample::HandleSceneUpdate(StringHash /*eventType*/, VariantMap& eventData)
     }
 }
 
-void Sample::HandleBeginRendering(StringHash eventType, VariantMap& eventData)
-{
-    if (scene_)
-    {
-        VR* vr = GetSubsystem<VR>();
-
-        if (!vrData_)
-        {
-            vrData_ = new VRSampleData();
-
-            if (cameraNode_)
-            {
-                vrData_->worldFromVr_ = cameraNode_->GetTransform();
-
-                const float eyeNear = cameraNode_->GetComponent<Camera>()->GetNearClip();
-                const float eyeFar = cameraNode_->GetComponent<Camera>()->GetFarClip();
-
-                vr->SetEyeNearAndFar(eyeNear, eyeFar);
-            }
-
-            const unsigned renderWidth = vr->GetRecommendedRenderTargetWidth();
-            const unsigned renderHeight = vr->GetRecommendedRenderTargetHeight();
-
-            for (int i = 0; i < 2; ++i)
-            {
-                vrData_->eyeData_[i].cameraTexture_ = new Texture2D(context_);
-                vrData_->eyeData_[i].cameraTexture_->SetSize(renderWidth, renderHeight, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
-                vrData_->eyeData_[i].cameraTexture_->SetFilterMode(FILTER_BILINEAR);
-
-                RenderSurface* surface = vrData_->eyeData_[i].cameraTexture_->GetRenderSurface();
-                surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
-
-                vrData_->eyeData_[i].cameraNode_ = new Node(context_);
-                Camera* eyeCamera = vrData_->eyeData_[i].cameraNode_->CreateComponent<Camera>();
-                eyeCamera->SetProjection(vr->GetProjection(static_cast<VR::Eye>(i)));
-
-                SharedPtr<Viewport> rttViewport(new Viewport(context_, scene_, eyeCamera));
-                surface->SetViewport(0, rttViewport);
-            }
-        }
-
-        vr->UpdatePosesBeforeRendering();
-
-        const Matrix3x4& vrFromHead = vr->GetWorldFromHeadTransform();
-        vrData_->eyeData_[0].cameraNode_->SetTransform(vrData_->worldFromVr_ * vrFromHead * vr->GetHeadFromEyeTransform(VR::EYE_LEFT));
-        vrData_->eyeData_[1].cameraNode_->SetTransform(vrData_->worldFromVr_ * vrFromHead * vr->GetHeadFromEyeTransform(VR::EYE_RIGHT));
-    }
-}
-
-void Sample::HandleEndRendering(StringHash eventType, VariantMap& eventData)
-{
-    if (scene_ && vrData_)
-    {
-        VR* vr = GetSubsystem<VR>();
-
-        Texture2D* eyeTextures[2] = { vrData_->eyeData_[0].cameraTexture_, vrData_->eyeData_[1].cameraTexture_ };
-        vr->SubmitEyeTexturesAfterRendering(eyeTextures);
-    }
-}
-
 void Sample::HandleTouchBegin(StringHash /*eventType*/, VariantMap& eventData)
 {
     // On some platforms like Windows the presence of touch input can only be detected dynamically
@@ -485,4 +416,32 @@ void Sample::HandleMouseModeChange(StringHash /*eventType*/, VariantMap& eventDa
     Input* input = GetSubsystem<Input>();
     bool mouseLocked = eventData[MouseModeChanged::P_MOUSELOCKED].GetBool();
     input->SetMouseVisible(!mouseLocked);
+}
+
+void Sample::HandleEndFrame(StringHash /*eventType*/, VariantMap& eventData)
+{
+    if (scene_ && cameraNode_ && !GetSubsystem<VR>())
+    {
+        Camera* camera = cameraNode_->GetComponent<Camera>();
+        if (camera)
+        {
+            VR* vr = new VR(context_);
+            {
+                Renderer* renderer = GetSubsystem<Renderer>();
+
+                vr->SetNearClip(camera->GetNearClip());
+
+                vr->SetFarClip(camera->GetFarClip());
+
+                vr->SetRenderPath(renderer->GetViewport(0)->GetRenderPath());
+
+                vr->SetScene(scene_);
+
+                vr->SetWorldFromVRTransform(cameraNode_->GetTransform());
+            }
+
+            // Register VR subsystem
+            context_->RegisterSubsystem(vr);
+        }
+    }
 }

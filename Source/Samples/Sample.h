@@ -39,18 +39,6 @@ using namespace Urho3D;
 
 const float TOUCH_SENSITIVITY = 2.0f;
 
-struct VRSampleData
-{
-    struct EyeData
-    {
-        SharedPtr<Node> cameraNode_;
-        SharedPtr<Texture2D> cameraTexture_;
-    };
-
-    Matrix3x4 worldFromVr_;
-    EyeData eyeData_[2];
-};
-
 /// Sample class, as framework for all samples.
 ///    - Initialization of the Urho3D engine (in Application class)
 ///    - Modify engine parameters for windowed mode and to show the class name as title
@@ -93,8 +81,6 @@ protected:
     SharedPtr<Scene> scene_;
     /// Camera scene node.
     SharedPtr<Node> cameraNode_;
-    /// VR camera nodes, rendertextures and transform offset.
-    VRSampleData* vrData_;
     /// Camera yaw angle.
     float yaw_;
     /// Camera pitch angle.
@@ -121,12 +107,10 @@ private:
     void HandleKeyUp(StringHash eventType, VariantMap& eventData);
     /// Handle scene update event to control camera's pitch and yaw for all samples.
     void HandleSceneUpdate(StringHash eventType, VariantMap& eventData);
-    /// Handle begin rendering event to update VR pose data.
-    void HandleBeginRendering(StringHash eventType, VariantMap& eventData);
-    /// Handle end rendering event to submit VR texture data.
-    void HandleEndRendering(StringHash eventType, VariantMap& eventData);
     /// Handle touch begin event to initialize touch input on desktop platform.
     void HandleTouchBegin(StringHash eventType, VariantMap& eventData);
+    /// Handle end frame event to register VR subsystem on demand
+    void HandleEndFrame(StringHash eventType, VariantMap& eventData);
 
     /// Screen joystick index for navigational controls (mobile platforms only).
     unsigned screenJoystickIndex_;

@@ -2,71 +2,74 @@
 
 #include "../Core/Object.h"
 
-namespace vr
-{
-    class IVRSystem;
-}
-
 namespace Urho3D
 {
 
+class Node;
+class RenderPath;
+class Scene;
 class Texture2D;
+class VRImpl;
 
 class URHO3D_API VR : public Object
 {
     URHO3D_OBJECT(VR, Object);
 
-    struct EyeData
-    {
-        Urho3D::Matrix3x4 eyeToHeadTransform_;
-        Urho3D::Matrix4 projection_;
-    };
-
 public:
-
-    enum Eye
-    {
-        EYE_LEFT,
-        EYE_RIGHT,
-
-        NUM_EYES
-    };
 
     VR(Context* context_);
 
     virtual ~VR();
 
-    unsigned GetRecommendedRenderTargetWidth() const { return recommendedRenderTargetWidth_; }
+    void SetRenderResolutionScale(float renderResolutionScale);
 
-    unsigned GetRecommendedRenderTargetHeight() const { return recommendedRenderTargetHeight_; }
+    void SetNearClip(float nearClip);
 
-    const Matrix3x4& GetWorldFromHeadTransform() const;
+    void SetFarClip(float farClip);
 
-    const Matrix3x4& GetHeadFromEyeTransform(Eye eye) const { return eyeData_[eye].eyeToHeadTransform_; }
+    void SetRenderPath(RenderPath* renderPath);
 
-    const Matrix4& GetProjection(Eye eye) const { return eyeData_[eye].projection_; }
+    void SetScene(Scene* scene);
 
-    void SetEyeNearAndFar(float eyeNear, float eyeFar);
-
-    void UpdatePosesBeforeRendering();
-
-    void SubmitEyeTexturesAfterRendering(Texture2D* eyeTextures[NUM_EYES]);
+    void SetWorldFromVRTransform(const Matrix3x4& worldFromVR);
 
 private:
 
-    void Initialize();
+    int Initialize();
+
+    void Shutdown();
+
+    void HandleBeginFrame(StringHash eventType, VariantMap& eventData);
+
+    void HandleBeginViewUpdate(StringHash eventType, VariantMap& eventData);
+
+    void HandleEndViewRender(StringHash eventType, VariantMap& eventData);
+
+    void UpdatePosesThisFrame();
 
 private:
 
-    struct VRData* vrData_;
+    VRImpl* vrImpl_;
 
-    vr::IVRSystem* vrSystem_;
+    float renderResolutionScale_;
 
-    unsigned recommendedRenderTargetWidth_;
+    float nearClip_;
 
-    unsigned recommendedRenderTargetHeight_;
+    float farClip_;
 
-    EyeData eyeData_[NUM_EYES];
+    bool renderParamsDirty_;
+
+    bool posesUpdatedThisFrame_;
+
+    WeakPtr<RenderPath> renderPath_;
+
+    WeakPtr<Scene> scene_;
+
+    SharedPtr<Node> headNode_;
+
+    SharedPtr<Texture2D> cameraTextures_[2];
+
+    Matrix3x4 worldFromVR_;
 };
 
 }
