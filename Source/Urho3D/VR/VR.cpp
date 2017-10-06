@@ -26,14 +26,16 @@ namespace
     const float MAX_RENDER_RESOLUTION_SCALE = 8.0f;
     const float DEFAULT_RENDER_RESOLUTION_SCALE = 1.0f;
 
-    void OpenVRAffineTransformToMatrix3x4(vr::HmdMatrix34_t const& in, Urho3D::Matrix3x4& out)
+    Urho3D::Matrix3x4 OpenVRAffineTransformToMatrix3x4(vr::HmdMatrix34_t const& in)
     {
-        out.m00_ = in.m[0][0]; out.m01_ = in.m[0][1]; out.m02_ = -in.m[0][2]; out.m03_ = in.m[0][3];
-        out.m10_ = in.m[1][0]; out.m11_ = in.m[1][1]; out.m12_ = -in.m[1][2]; out.m13_ = in.m[1][3];
-        out.m20_ = -in.m[2][0]; out.m21_ = -in.m[2][1]; out.m22_ = in.m[2][2]; out.m23_ = -in.m[2][3];
+        return Urho3D::Matrix3x4(
+             in.m[0][0],  in.m[0][1], -in.m[0][2],  in.m[0][3],
+             in.m[1][0],  in.m[1][1], -in.m[1][2],  in.m[1][3],
+            -in.m[2][0], -in.m[2][1],  in.m[2][2], -in.m[2][3]
+        );
     }
 
-    void OpenVRProjectionToMatrix4(vr::HmdMatrix44_t const& in, Urho3D::Matrix4& out)
+    Urho3D::Matrix4 OpenVRProjectionToMatrix4(vr::HmdMatrix44_t const& in)
     {
 #if 0
         float l, r, t, b, zn = 0.1f, zf = 30.f;
@@ -60,10 +62,12 @@ namespace
         vrData_->eyeProjection_[eye].m32_ = 1;
         vrData_->eyeProjection_[eye].m33_ = 0;
 #endif
-        out.m00_ = in.m[0][0]; out.m01_ = in.m[0][1]; out.m02_ = -in.m[0][2]; out.m03_ = in.m[0][3];
-        out.m10_ = in.m[1][0]; out.m11_ = in.m[1][1]; out.m12_ = -in.m[1][2]; out.m13_ = in.m[1][3];
-        out.m20_ = in.m[2][0]; out.m21_ = in.m[2][1]; out.m22_ = -in.m[2][2]; out.m23_ = in.m[2][3];
-        out.m30_ = in.m[3][0]; out.m31_ = in.m[3][1]; out.m32_ = -in.m[3][2]; out.m33_ = in.m[3][3];
+        return Urho3D::Matrix4(
+            in.m[0][0], in.m[0][1], -in.m[0][2], in.m[0][3],
+            in.m[1][0], in.m[1][1], -in.m[1][2], in.m[1][3],
+            in.m[2][0], in.m[2][1], -in.m[2][2], in.m[2][3],
+            in.m[3][0], in.m[3][1], -in.m[3][2], in.m[3][3]
+        );
     }
 }
 
@@ -97,9 +101,10 @@ VR::VR(Context* context_) :
     nearClip_(DEFAULT_NEAR_CLIP),
     farClip_(DEFAULT_FAR_CLIP),
     renderParamsDirty_(false),
+    currentFrame_(0),
     posesUpdatedThisFrame_(false)
 {
-    if (Initialize() == 0)
+    if (InitializeVR() == 0)
     {
         SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(VR, HandleBeginFrame));
     }
@@ -107,16 +112,7 @@ VR::VR(Context* context_) :
 
 VR::~VR()
 {
-    Shutdown();
-
-    if (vrImpl_->vrSystem_)
-    {
-        vr::VR_Shutdown();
-        vrImpl_->vrSystem_ = 0;
-    }
-
-    delete vrImpl_;
-    vrImpl_ = 0;
+    ShutdownVR();
 }
 
 void VR::SetRenderResolutionScale(float renderResolutionScale)
@@ -194,7 +190,7 @@ void VR::SetWorldFromVRTransform(const Matrix3x4& worldFromVR)
     worldFromVR_ = worldFromVR;
 }
 
-int VR::Initialize()
+int VR::InitializeVR()
 {
     vr::EVRInitError err;
     vrImpl_->vrSystem_ = vr::VR_Init(&err, vr::VRApplication_Scene);
@@ -207,19 +203,95 @@ int VR::Initialize()
     return err;
 }
 
-void VR::Shutdown()
+void VR::ShutdownVR()
 {
-    URHO3D_LOGINFO("VR shutting down");
-        
-    UnsubscribeFromEvent(E_BEGINVIEWUPDATE);
-    UnsubscribeFromEvent(E_ENDVIEWUPDATE);
+    if (vrImpl_->vrSystem_)
+    {
+        vr::VR_Shutdown();
+        vrImpl_->vrSystem_ = 0;
+    }
 
-    headNode_.Reset();
+    delete vrImpl_;
+    vrImpl_ = 0;
+}
+
+void VR::CreateHMDNodeAndTextures()
+{
+    unsigned renderWidth, renderHeight;
+    vrImpl_->vrSystem_->GetRecommendedRenderTargetSize(&renderWidth, &renderHeight);
+
+    const int textureWidth = int(renderWidth * renderResolutionScale_);
+    const int textureHeight = int(renderHeight * renderResolutionScale_);
+
+    URHO3D_LOGINFOF("VR initializing with %dx%d eye textures", textureWidth, textureHeight);
+    HMDNode_ = new Node(context_);
+
+    for (int eye = 0; eye < 2; ++eye)
+    {
+        // Create texture
+        cameraTextures_[eye] = new Texture2D(context_);
+        cameraTextures_[eye]->SetSize(textureWidth, textureHeight, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+        cameraTextures_[eye]->SetFilterMode(FILTER_BILINEAR);
+
+        // Set render surface to always update
+        RenderSurface* surface = cameraTextures_[eye]->GetRenderSurface();
+        surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
+
+        // Create camera node
+        Node* cameraNode = HMDNode_->CreateChild(0 == eye ? "LeftEye" : "RightEye");
+        {
+            // Set head from eye transform
+            vr::HmdMatrix34_t vrHeadFromEye = vrImpl_->vrSystem_->GetEyeToHeadTransform(vr::EVREye(eye));
+
+            Matrix3x4 headFromEye = OpenVRAffineTransformToMatrix3x4(vrHeadFromEye);
+
+            cameraNode->SetTransform(headFromEye);
+
+            // Create camera component
+            Camera* eyeCamera = cameraNode->CreateComponent<Camera>();
+            {
+                // Set projection
+                vr::HmdMatrix44_t vrProj = vrImpl_->vrSystem_->GetProjectionMatrix(vr::EVREye(eye), nearClip_, farClip_);
+
+                Matrix4 proj = OpenVRProjectionToMatrix4(vrProj);
+
+                eyeCamera->SetProjection(proj);
+
+                // Set scene camera viewport
+                SharedPtr<Viewport> eyeViewport(new Viewport(context_, scene_, eyeCamera));
+
+                // Set viewport render path
+                if (renderPath_)
+                {
+                    eyeViewport->SetRenderPath(renderPath_);
+                }
+
+                surface->SetViewport(0, eyeViewport);
+            }
+        }
+    }
+}
+
+void VR::DestroyHMDNodeAndTextures()
+{
+    HMDNode_.Reset();
 
     for (int eye = 0; eye < 2; ++eye)
     {
         cameraTextures_[eye].Reset();
     }
+}
+
+void VR::SubscribeToViewEvents()
+{
+    SubscribeToEvent(E_BEGINVIEWUPDATE, URHO3D_HANDLER(VR, HandleBeginViewUpdate));
+    SubscribeToEvent(E_ENDVIEWRENDER, URHO3D_HANDLER(VR, HandleEndViewRender));
+}
+
+void VR::UnsubscribeFromViewEvents()
+{
+    UnsubscribeFromEvent(E_ENDVIEWUPDATE);
+    UnsubscribeFromEvent(E_BEGINVIEWUPDATE);
 }
 
 void VR::UpdatePosesThisFrame()
@@ -232,17 +304,42 @@ void VR::UpdatePosesThisFrame()
 
     for (int nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; ++nDevice)
     {
-        if (trackedDevicePose[nDevice].bPoseIsValid)
+        if (trackedDevicePose[nDevice].bDeviceIsConnected && trackedDevicePose[nDevice].bPoseIsValid)
         {
-            switch (nDevice)
-            {
-            case vr::k_unTrackedDeviceIndex_Hmd:
-                if (headNode_)
-                {
-                    Matrix3x4 vrFromDevice;
-                    OpenVRAffineTransformToMatrix3x4(trackedDevicePose[nDevice].mDeviceToAbsoluteTracking, vrFromDevice);
+            vr::ETrackedDeviceClass deviceClass = vrImpl_->vrSystem_->GetTrackedDeviceClass(nDevice);
 
-                    headNode_->SetTransform(worldFromVR_ * vrFromDevice);
+            switch (deviceClass)
+            {
+            case vr::TrackedDeviceClass_HMD:
+                {
+                    Matrix3x4 VRFromHmd = OpenVRAffineTransformToMatrix3x4(trackedDevicePose[nDevice].mDeviceToAbsoluteTracking);
+
+                    worldFromHMD_ = worldFromVR_ * VRFromHmd;
+                    if (HMDNode_)
+                    {
+                        HMDNode_->SetTransform(worldFromHMD_);
+                    }
+
+                    HMDFrame_ = currentFrame_;
+                }
+                break;
+
+            case vr::TrackedDeviceClass_Controller:
+                {
+                    Matrix3x4 VRFromController = OpenVRAffineTransformToMatrix3x4(trackedDevicePose[nDevice].mDeviceToAbsoluteTracking);
+                
+                    switch (vrImpl_->vrSystem_->GetControllerRoleForTrackedDeviceIndex(nDevice))
+                    {
+                    case vr::TrackedControllerRole_LeftHand:
+                        worldFromController_[0] = worldFromVR_ * VRFromController;
+                        controllerFrame_[0] = currentFrame_;
+                        break;
+
+                    case vr::TrackedControllerRole_RightHand:
+                        worldFromController_[1] = worldFromVR_ * VRFromController;
+                        controllerFrame_[1] = currentFrame_;
+                        break;
+                    }
                 }
                 break;
             }
@@ -254,76 +351,26 @@ void VR::UpdatePosesThisFrame()
 
 void VR::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
 {
+    using namespace BeginFrame;
+
+    currentFrame_ = eventData[P_FRAMENUMBER].GetUInt();
     posesUpdatedThisFrame_ = false;
 
-    const bool sceneDestroyed = (headNode_ && !scene_);
-    if (renderParamsDirty_ || sceneDestroyed)
+    const bool HMDCreatedAndSceneDestroyed = (HMDNode_ && !scene_);
+    if (renderParamsDirty_ || HMDCreatedAndSceneDestroyed)
     {
-        if (headNode_)
+        if (HMDNode_)
         {
-            Shutdown();
+            UnsubscribeFromViewEvents();
+
+            DestroyHMDNodeAndTextures();
         }
 
         if (vrImpl_->vrSystem_ && scene_)
         {
-            unsigned renderWidth, renderHeight;
-            vrImpl_->vrSystem_->GetRecommendedRenderTargetSize(&renderWidth, &renderHeight);
+            CreateHMDNodeAndTextures();
 
-            const int textureWidth = int(renderWidth * renderResolutionScale_);
-            const int textureHeight = int(renderHeight * renderResolutionScale_);
-
-            URHO3D_LOGINFOF("VR initializing with %dx%d eye textures", textureWidth, textureHeight);
-            headNode_ = new Node(context_);
-
-            for (int eye = 0; eye < 2; ++eye)
-            {
-                // Create texture
-                cameraTextures_[eye] = new Texture2D(context_);
-                cameraTextures_[eye]->SetSize(textureWidth, textureHeight, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
-                cameraTextures_[eye]->SetFilterMode(FILTER_BILINEAR);
-
-                // Set render surface to always update
-                RenderSurface* surface = cameraTextures_[eye]->GetRenderSurface();
-                surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
-
-                // Create camera node
-                Node* cameraNode = headNode_->CreateChild(0 == eye ? "LeftEye" : "RightEye");
-                {
-                    // Set head from eye transform
-                    vr::HmdMatrix34_t vrHeadFromEye = vrImpl_->vrSystem_->GetEyeToHeadTransform(vr::EVREye(eye));
-
-                    Matrix3x4 headFromEye;
-                    OpenVRAffineTransformToMatrix3x4(vrHeadFromEye, headFromEye);
-
-                    cameraNode->SetTransform(headFromEye);
-
-                    // Create camera component
-                    Camera* eyeCamera = cameraNode->CreateComponent<Camera>();
-                    {
-                        // Set projection
-                        vr::HmdMatrix44_t vrProj = vrImpl_->vrSystem_->GetProjectionMatrix(vr::EVREye(eye), nearClip_, farClip_);
-
-                        Matrix4 proj;
-                        OpenVRProjectionToMatrix4(vrProj, proj);
-
-                        eyeCamera->SetProjection(proj);
-
-                        // Set scene camera viewport
-                        SharedPtr<Viewport> eyeViewport(new Viewport(context_, scene_, eyeCamera));
-
-                        // Set viewport render path
-                        if (renderPath_)
-                        {
-                            eyeViewport->SetRenderPath(renderPath_);
-                        }
-
-                        surface->SetViewport(0, eyeViewport);
-                    }
-                }
-            }
-
-            SubscribeToEvent(E_BEGINVIEWUPDATE, URHO3D_HANDLER(VR, HandleBeginViewUpdate));
-            SubscribeToEvent(E_ENDVIEWRENDER, URHO3D_HANDLER(VR, HandleEndViewRender));
+            SubscribeToViewEvents();
         }
 
         renderParamsDirty_ = false;
@@ -363,8 +410,17 @@ void VR::HandleEndViewRender(StringHash eventType, VariantMap& eventData)
     {
         vr::Texture_t vrTex;
         {
+#if defined(URHO3D_D3D11)
             vrTex.handle = texture->GetGPUObject();
             vrTex.eType = vr::TextureType_DirectX;
+#elif defined(URHO3D_OPENGL)
+            // todo.cb OpenGL textures are upside down
+            intptr_t textureName = texture->GetGPUObjectName();
+            vrTex.handle = reinterpret_cast<void*&>(textureName);
+            vrTex.eType = vr::TextureType_OpenGL;
+#else
+#error Unsupported VR graphics API!
+#endif
             vrTex.eColorSpace = vr::ColorSpace_Auto;
         }
 

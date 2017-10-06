@@ -420,28 +420,57 @@ void Sample::HandleMouseModeChange(StringHash /*eventType*/, VariantMap& eventDa
 
 void Sample::HandleEndFrame(StringHash /*eventType*/, VariantMap& eventData)
 {
-    if (scene_ && cameraNode_ && !GetSubsystem<VR>())
+    if (scene_)
     {
-        Camera* camera = cameraNode_->GetComponent<Camera>();
-        if (camera)
+        if (cameraNode_ && !GetSubsystem<VR>())
         {
-            VR* vr = new VR(context_);
+            Camera* camera = cameraNode_->GetComponent<Camera>();
+            if (camera)
             {
-                Renderer* renderer = GetSubsystem<Renderer>();
+                VR* vr = new VR(context_);
+                {
+                    Renderer* renderer = GetSubsystem<Renderer>();
 
-                vr->SetNearClip(camera->GetNearClip());
+                    vr->SetNearClip(camera->GetNearClip());
 
-                vr->SetFarClip(camera->GetFarClip());
+                    vr->SetFarClip(camera->GetFarClip());
 
-                vr->SetRenderPath(renderer->GetViewport(0)->GetRenderPath());
+                    vr->SetRenderPath(renderer->GetViewport(0)->GetRenderPath());
 
-                vr->SetScene(scene_);
+                    vr->SetScene(scene_);
 
-                vr->SetWorldFromVRTransform(cameraNode_->GetTransform());
+                    vr->SetWorldFromVRTransform(cameraNode_->GetTransform());
+                }
+
+                // Register VR subsystem
+                context_->RegisterSubsystem(vr);
             }
 
-            // Register VR subsystem
-            context_->RegisterSubsystem(vr);
+            ResourceCache* cache = GetSubsystem<ResourceCache>();
+            for (int i = 0; i < 2; ++i)
+            {
+                VRControllerNode_[i] = scene_->CreateChild(i == 0 ? "VRLeftController" : "VRRightController");
+
+                Node* VRControllerModelNode = VRControllerNode_[i]->CreateChild();
+                VRControllerModelNode->SetScale(0.1f);
+
+                StaticModel* controllerModel = VRControllerModelNode->CreateComponent<StaticModel>();
+                {
+                    controllerModel->SetModel(cache->GetResource<Model>("Models/Editor/Axes.mdl"));
+
+                    controllerModel->SetMaterial(0, cache->GetResource<Material>("Materials/Editor/RedUnlit.xml"));
+                    controllerModel->SetMaterial(1, cache->GetResource<Material>("Materials/Editor/GreenUnlit.xml"));
+                    controllerModel->SetMaterial(2, cache->GetResource<Material>("Materials/Editor/BlueUnlit.xml"));
+                }
+            }
+        }
+
+        if (VR* vr = GetSubsystem<VR>())
+        {
+            for (int i = 0; i < 2; ++i)
+            {
+                VRControllerNode_[i]->SetTransform(vr->GetWorldFromControllerTransform(i));
+            }
         }
     }
 }

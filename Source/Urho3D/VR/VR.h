@@ -33,19 +33,31 @@ public:
 
     void SetWorldFromVRTransform(const Matrix3x4& worldFromVR);
 
+    const Matrix3x4& GetWorldFromHMDTransform() const { return worldFromHMD_; }
+
+    const Matrix3x4& GetWorldFromControllerTransform(int controllerIndex) const { return worldFromController_[controllerIndex]; }
+
 private:
 
-    int Initialize();
+    int InitializeVR();
 
-    void Shutdown();
+    void ShutdownVR();
+
+    void CreateHMDNodeAndTextures();
+
+    void DestroyHMDNodeAndTextures();
+        
+    void SubscribeToViewEvents();
+
+    void UnsubscribeFromViewEvents();
+
+    void UpdatePosesThisFrame();
 
     void HandleBeginFrame(StringHash eventType, VariantMap& eventData);
 
     void HandleBeginViewUpdate(StringHash eventType, VariantMap& eventData);
 
     void HandleEndViewRender(StringHash eventType, VariantMap& eventData);
-
-    void UpdatePosesThisFrame();
 
 private:
 
@@ -59,17 +71,27 @@ private:
 
     bool renderParamsDirty_;
 
+    unsigned currentFrame_;
+
     bool posesUpdatedThisFrame_;
 
     WeakPtr<RenderPath> renderPath_;
 
     WeakPtr<Scene> scene_;
 
-    SharedPtr<Node> headNode_;
+    SharedPtr<Node> HMDNode_;
 
     SharedPtr<Texture2D> cameraTextures_[2];
 
     Matrix3x4 worldFromVR_;
+
+    unsigned HMDFrame_;
+
+    unsigned controllerFrame_[2];
+
+    Matrix3x4 worldFromHMD_;
+
+    Matrix3x4 worldFromController_[2];
 };
 
 }

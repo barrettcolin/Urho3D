@@ -90,6 +90,8 @@ protected:
     /// Mouse mode option to use in the sample.
     MouseMode useMouseMode_;
 
+    Node* VRControllerNode_[2];
+
 private:
     /// Create logo.
     void CreateLogo();
