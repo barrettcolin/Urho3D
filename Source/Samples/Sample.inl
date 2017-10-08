@@ -98,7 +98,7 @@ void Sample::Start()
     // Subscribe scene update event
     SubscribeToEvent(E_SCENEUPDATE, URHO3D_HANDLER(Sample, HandleSceneUpdate));
 
-//#if defined(URHO3D_OPENVR)
+#if defined(URHO3D_VR)
     // Register VR subsystem
     context_->RegisterSubsystem(new VR(context_));
     // Subscribe VR device connected event
@@ -107,7 +107,7 @@ void Sample::Start()
     SubscribeToEvent(E_VRDEVICEDISCONNECTED, URHO3D_HANDLER(Sample, HandleVRDeviceDisconnected));
     // Subscribe VR device pose updated for rendering event
     SubscribeToEvent(E_VRDEVICEPOSEUPDATEDFORRENDERING, URHO3D_HANDLER(Sample, HandleVRDevicePoseUpdatedForRendering));
-//#endif
+#endif
 }
 
 void Sample::Stop()
@@ -430,6 +430,7 @@ void Sample::HandleMouseModeChange(StringHash /*eventType*/, VariantMap& eventDa
 
 void Sample::HandleVRDeviceConnected(StringHash eventType, VariantMap& eventData)
 {
+#if defined(URHO3D_VR)
     using namespace VRDeviceConnected;
 
     const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
@@ -481,10 +482,12 @@ void Sample::HandleVRDeviceConnected(StringHash eventType, VariantMap& eventData
         }
         break;
     }
+#endif
 }
 
 void Sample::HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventData)
 {
+#if defined(URHO3D_VR)
     using namespace VRDeviceDisconnected;
 
     const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
@@ -512,10 +515,12 @@ void Sample::HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventD
         }
         break;
     }
+#endif
 }
 
 void Sample::HandleVRDevicePoseUpdatedForRendering(StringHash eventType, VariantMap& eventData)
 {
+#if defined(URHO3D_VR)
     using namespace VRDevicePoseUpdatedForRendering;
 
     const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
@@ -536,4 +541,5 @@ void Sample::HandleVRDevicePoseUpdatedForRendering(StringHash eventType, Variant
         }
         break;
     }
+#endif
 }

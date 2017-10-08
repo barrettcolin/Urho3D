@@ -131,6 +131,10 @@ if (NOT ANDROID AND NOT ARM AND NOT WEB)
     endif ()
 endif ()
 
+if (URHO3D_VR)
+    add_subdirectory (ThirdParty/openvr)
+endif ()
+
 # Urho3D game engine library
 add_subdirectory (Urho3D)
 

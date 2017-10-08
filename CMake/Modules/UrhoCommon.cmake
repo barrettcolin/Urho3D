@@ -167,6 +167,7 @@ if (CMAKE_PROJECT_NAME STREQUAL Urho3D)
     # On Windows platform Direct3D11 can be optionally chosen
     # Using Direct3D11 on non-MSVC compiler may require copying and renaming Microsoft official libraries (.lib to .a), else link failures or non-functioning graphics may result
     cmake_dependent_option (URHO3D_D3D11 "Use Direct3D11 instead of Direct3D9 (Windows platform only); overrides URHO3D_OPENGL option" FALSE "WIN32" FALSE)
+    cmake_dependent_option (URHO3D_VR "Enable VR" FALSE "${URHO3D_D3D11}" FALSE)
     if (MINGW AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9.1)
         if (NOT DEFINED URHO3D_SSE)     # Only give the warning once during initial configuration
             # Certain MinGW versions fail to compile SSE code. This is the initial guess for known "bad" version range, and can be tightened later
@@ -388,6 +389,7 @@ if (URHO3D_CLANG_TOOLS)
             URHO3D_LUA
             URHO3D_NAVIGATION
             URHO3D_NETWORK
+            URHO3D_VR
             URHO3D_PHYSICS
             URHO3D_PROFILING
             URHO3D_URHO2D)
@@ -445,6 +447,7 @@ foreach (OPT
         URHO3D_MINIDUMPS
         URHO3D_NAVIGATION
         URHO3D_NETWORK
+        URHO3D_VR
         URHO3D_PHYSICS
         URHO3D_PROFILING
         URHO3D_THREADING
