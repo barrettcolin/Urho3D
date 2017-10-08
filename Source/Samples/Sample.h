@@ -111,8 +111,12 @@ private:
     void HandleSceneUpdate(StringHash eventType, VariantMap& eventData);
     /// Handle touch begin event to initialize touch input on desktop platform.
     void HandleTouchBegin(StringHash eventType, VariantMap& eventData);
-    /// Handle end frame event to register VR subsystem on demand
-    void HandleEndFrame(StringHash eventType, VariantMap& eventData);
+    /// Handle VR device connected to start HMD scene rendering and respond to controller connection
+    void HandleVRDeviceConnected(StringHash eventType, VariantMap& eventData);
+    /// Handle VR device disconnected to stop HMD scene rendering and respond to controller disconnection
+    void HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventData);
+    /// Handle VR device pose updated for rendering to update controller display
+    void HandleVRDevicePoseUpdatedForRendering(StringHash eventType, VariantMap& eventData);
 
     /// Screen joystick index for navigational controls (mobile platforms only).
     unsigned screenJoystickIndex_;

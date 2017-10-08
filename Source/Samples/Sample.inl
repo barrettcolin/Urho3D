@@ -96,8 +96,17 @@ void Sample::Start()
     SubscribeToEvent(E_KEYUP, URHO3D_HANDLER(Sample, HandleKeyUp));
     // Subscribe scene update event
     SubscribeToEvent(E_SCENEUPDATE, URHO3D_HANDLER(Sample, HandleSceneUpdate));
-    // Subscribe end frame event
-    SubscribeToEvent(E_ENDFRAME, URHO3D_HANDLER(Sample, HandleEndFrame));
+
+//#if defined(URHO3D_OPENVR)
+    // Register VR subsystem
+    context_->RegisterSubsystem(new VR(context_));
+    // Subscribe VR device connected event
+    SubscribeToEvent(E_VRDEVICECONNECTED, URHO3D_HANDLER(Sample, HandleVRDeviceConnected));
+    // Subscribe VR device disconnected event
+    SubscribeToEvent(E_VRDEVICEDISCONNECTED, URHO3D_HANDLER(Sample, HandleVRDeviceDisconnected));
+    // Subscribe VR device pose updated for rendering event
+    SubscribeToEvent(E_VRDEVICEPOSEUPDATEDFORRENDERING, URHO3D_HANDLER(Sample, HandleVRDevicePoseUpdatedForRendering));
+//#endif
 }
 
 void Sample::Stop()
@@ -418,59 +427,112 @@ void Sample::HandleMouseModeChange(StringHash /*eventType*/, VariantMap& eventDa
     input->SetMouseVisible(!mouseLocked);
 }
 
-void Sample::HandleEndFrame(StringHash /*eventType*/, VariantMap& eventData)
+void Sample::HandleVRDeviceConnected(StringHash eventType, VariantMap& eventData)
 {
-    if (scene_)
+    using namespace VRDeviceConnected;
+
+    const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
+
+    switch (deviceType)
     {
-        if (cameraNode_ && !GetSubsystem<VR>())
+    case VRDEVICE_HMD:
+        if (scene_ && cameraNode_)
         {
             Camera* camera = cameraNode_->GetComponent<Camera>();
             if (camera)
             {
-                VR* vr = new VR(context_);
-                {
-                    Renderer* renderer = GetSubsystem<Renderer>();
+                VR* vr = GetSubsystem<VR>();
+                Renderer* renderer = GetSubsystem<Renderer>();
 
-                    vr->SetNearClip(camera->GetNearClip());
+                vr->SetNearClip(camera->GetNearClip());
 
-                    vr->SetFarClip(camera->GetFarClip());
+                vr->SetFarClip(camera->GetFarClip());
 
-                    vr->SetRenderPath(renderer->GetViewport(0)->GetRenderPath());
+                vr->SetRenderPath(renderer->GetViewport(0)->GetRenderPath());
 
-                    vr->SetScene(scene_);
+                vr->SetScene(scene_);
 
-                    vr->SetWorldFromVRTransform(cameraNode_->GetTransform());
-                }
-
-                // Register VR subsystem
-                context_->RegisterSubsystem(vr);
-            }
-
-            ResourceCache* cache = GetSubsystem<ResourceCache>();
-            for (int i = 0; i < 2; ++i)
-            {
-                VRControllerNode_[i] = scene_->CreateChild(i == 0 ? "VRLeftController" : "VRRightController");
-
-                Node* VRControllerModelNode = VRControllerNode_[i]->CreateChild();
-                VRControllerModelNode->SetScale(0.1f);
-
-                StaticModel* controllerModel = VRControllerModelNode->CreateComponent<StaticModel>();
-                {
-                    controllerModel->SetModel(cache->GetResource<Model>("Models/Editor/Axes.mdl"));
-
-                    controllerModel->SetMaterial(0, cache->GetResource<Material>("Materials/Editor/RedUnlit.xml"));
-                    controllerModel->SetMaterial(1, cache->GetResource<Material>("Materials/Editor/GreenUnlit.xml"));
-                    controllerModel->SetMaterial(2, cache->GetResource<Material>("Materials/Editor/BlueUnlit.xml"));
-                }
+                vr->SetWorldFromVRTransform(Matrix3x4(cameraNode_->GetPosition(), Quaternion::IDENTITY, 1.0f));
             }
         }
+        break;
 
-        if (VR* vr = GetSubsystem<VR>())
+    case VRDEVICE_CONTROLLER_LEFT:
+    case VRDEVICE_CONTROLLER_RIGHT:
         {
-            for (int i = 0; i < 2; ++i)
+            const int controllerIndex = (deviceType - VRDEVICE_CONTROLLER_LEFT);
+            VRControllerNode_[controllerIndex] = 
+                scene_->CreateChild(deviceType == VRDEVICE_CONTROLLER_LEFT ? "VRLeftController" : "VRRightController");
+
+            Node* VRControllerModelNode = VRControllerNode_[controllerIndex]->CreateChild();
+            VRControllerModelNode->SetScale(0.1f);
+
+            StaticModel* controllerModel = VRControllerModelNode->CreateComponent<StaticModel>();
             {
-                VRControllerNode_[i]->SetTransform(vr->GetWorldFromControllerTransform(i));
+                ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+                controllerModel->SetModel(cache->GetResource<Model>("Models/Editor/Axes.mdl"));
+
+                controllerModel->SetMaterial(0, cache->GetResource<Material>("Materials/Editor/RedUnlit.xml"));
+                controllerModel->SetMaterial(1, cache->GetResource<Material>("Materials/Editor/GreenUnlit.xml"));
+                controllerModel->SetMaterial(2, cache->GetResource<Material>("Materials/Editor/BlueUnlit.xml"));
             }
         }
+        break;
+    }
+}
+
+void Sample::HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventData)
+{
+    using namespace VRDeviceDisconnected;
+
+    const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
+
+    switch (deviceType)
+    {
+    case VRDEVICE_HMD:
+        {
+            VR* vr = GetSubsystem<VR>();
+
+            vr->SetScene(0);
+        }
+        break;
+
+    case VRDEVICE_CONTROLLER_LEFT:
+    case VRDEVICE_CONTROLLER_RIGHT:
+        {
+            const int controllerIndex = (deviceType - VRDEVICE_CONTROLLER_LEFT);
+
+            if (VRControllerNode_[controllerIndex])
+            {
+                VRControllerNode_[controllerIndex]->Remove();
+                VRControllerNode_[controllerIndex] = 0;
+            }
+        }
+        break;
+    }
+}
+
+void Sample::HandleVRDevicePoseUpdatedForRendering(StringHash eventType, VariantMap& eventData)
+{
+    using namespace VRDevicePoseUpdatedForRendering;
+
+    const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
+
+    switch (deviceType)
+    {
+    case VRDEVICE_CONTROLLER_LEFT:
+    case VRDEVICE_CONTROLLER_RIGHT:
+        {
+            const int controllerIndex = (deviceType - VRDEVICE_CONTROLLER_LEFT);
+
+            if (VRControllerNode_[controllerIndex])
+            {
+                VR* vr = GetSubsystem<VR>();
+
+                VRControllerNode_[controllerIndex]->SetTransform(vr->GetWorldFromVRTransform() * vr->GetVRFromDeviceTransform(deviceType));
+            }
+        }
+        break;
     }
 }

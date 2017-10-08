@@ -80,12 +80,29 @@ class URHO3D_API VRImpl
     friend class VR;
 
 public:
+    /// DeviceTrackingData
+    struct DeviceTrackingData
+    {
+        unsigned index_;
+        vr::ETrackedDeviceClass class_;
+        vr::ETrackedControllerRole role_;
+        vr::ETrackingResult result_;
+    };
+
+    /// DeviceTrackingDataFromIndex
+    typedef HashMap<unsigned, DeviceTrackingData> DeviceTrackingDataFromIndex;
+
+public:
     /// Construct.
     VRImpl();
+
+    DeviceTrackingDataFromIndex& AccessDeviceTrackingDataFromIndex() { return trackingResultFromDeviceIndex_; }
 
 private:
     /// OpenVR VRSystem interface
     vr::IVRSystem* vrSystem_;
+    /// ETrackingResult from device index
+    DeviceTrackingDataFromIndex trackingResultFromDeviceIndex_;
 };
 
 VRImpl::VRImpl() :
@@ -102,11 +119,13 @@ VR::VR(Context* context_) :
     farClip_(DEFAULT_FAR_CLIP),
     renderParamsDirty_(false),
     currentFrame_(0),
-    posesUpdatedThisFrame_(false)
+    posesUpdatedFrame_(0)
 {
     if (InitializeVR() == 0)
     {
         SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(VR, HandleBeginFrame));
+
+        SubscribeToViewEvents();
     }
 }
 
@@ -190,6 +209,12 @@ void VR::SetWorldFromVRTransform(const Matrix3x4& worldFromVR)
     worldFromVR_ = worldFromVR;
 }
 
+const Matrix3x4& VR::GetVRFromDeviceTransform(VRDeviceType vrDevice) const
+{
+    assert(vrDevice > VRDEVICE_INVALID && vrDevice < NUM_VR_DEVICE_TYPES);
+    return VRFromDevice_[vrDevice - 1];
+}
+
 int VR::InitializeVR()
 {
     vr::EVRInitError err;
@@ -266,7 +291,7 @@ void VR::CreateHMDNodeAndTextures()
                     eyeViewport->SetRenderPath(renderPath_);
                 }
 
-                surface->SetViewport(0, eyeViewport);
+                surface->SetViewport(0, eyeViewport);   
             }
         }
     }
@@ -296,57 +321,148 @@ void VR::UnsubscribeFromViewEvents()
 
 void VR::UpdatePosesThisFrame()
 {
-    if (posesUpdatedThisFrame_)
+    if (posesUpdatedFrame_ == currentFrame_)
         return;
 
-    vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
-    vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+    vr::TrackedDevicePose_t trackedDevicePoses[vr::k_unMaxTrackedDeviceCount];
+    vr::VRCompositor()->WaitGetPoses(trackedDevicePoses, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
-    for (int nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; ++nDevice)
+    for (unsigned nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; ++nDevice)
     {
-        if (trackedDevicePose[nDevice].bDeviceIsConnected && trackedDevicePose[nDevice].bPoseIsValid)
-        {
-            vr::ETrackedDeviceClass deviceClass = vrImpl_->vrSystem_->GetTrackedDeviceClass(nDevice);
+        const vr::TrackedDevicePose_t& trackedDevicePose = trackedDevicePoses[nDevice];
+        VRDeviceType deviceType = VRDEVICE_INVALID;
 
+        const vr::ETrackedDeviceClass deviceClass = vrImpl_->vrSystem_->GetTrackedDeviceClass(nDevice);
+        vr::ETrackedControllerRole controllerRole = vr::TrackedControllerRole_Invalid;
+        {
             switch (deviceClass)
             {
             case vr::TrackedDeviceClass_HMD:
-                {
-                    Matrix3x4 VRFromHmd = OpenVRAffineTransformToMatrix3x4(trackedDevicePose[nDevice].mDeviceToAbsoluteTracking);
-
-                    worldFromHMD_ = worldFromVR_ * VRFromHmd;
-                    if (HMDNode_)
-                    {
-                        HMDNode_->SetTransform(worldFromHMD_);
-                    }
-
-                    HMDFrame_ = currentFrame_;
-                }
+                deviceType = VRDEVICE_HMD;
                 break;
 
             case vr::TrackedDeviceClass_Controller:
+                controllerRole = vrImpl_->vrSystem_->GetControllerRoleForTrackedDeviceIndex(nDevice);
+                switch (controllerRole)
                 {
-                    Matrix3x4 VRFromController = OpenVRAffineTransformToMatrix3x4(trackedDevicePose[nDevice].mDeviceToAbsoluteTracking);
-                
-                    switch (vrImpl_->vrSystem_->GetControllerRoleForTrackedDeviceIndex(nDevice))
-                    {
-                    case vr::TrackedControllerRole_LeftHand:
-                        worldFromController_[0] = worldFromVR_ * VRFromController;
-                        controllerFrame_[0] = currentFrame_;
-                        break;
+                case vr::TrackedControllerRole_LeftHand:
+                    deviceType = VRDEVICE_CONTROLLER_LEFT;
+                    break;
 
-                    case vr::TrackedControllerRole_RightHand:
-                        worldFromController_[1] = worldFromVR_ * VRFromController;
-                        controllerFrame_[1] = currentFrame_;
-                        break;
-                    }
+                case vr::TrackedControllerRole_RightHand:
+                    deviceType = VRDEVICE_CONTROLLER_RIGHT;
+                    break;
                 }
                 break;
             }
         }
+
+        VRImpl::DeviceTrackingDataFromIndex& deviceTrackingDataFromIndex = vrImpl_->AccessDeviceTrackingDataFromIndex();
+
+        VRImpl::DeviceTrackingData trackingData;
+        if (deviceTrackingDataFromIndex.TryGetValue(nDevice, trackingData))
+        {
+            // Device is known
+            assert(trackingData.index_ == nDevice && trackingData.class_ == deviceClass/* && trackingData.role_ == controllerRole*/);
+
+            if (!trackedDevicePose.bDeviceIsConnected)
+            {
+                // OpenVR (sometimes?) reports a different (invalid) controller role on disconnection; log this and use the stored value
+                if (trackingData.role_ != controllerRole)
+                {
+                    assert(trackingData.role_ != vr::TrackedControllerRole_Invalid);
+
+                    URHO3D_LOGINFOF("Disconnecting VR device was previously seen with role %d, now %d; forcing old value", trackingData.role_, controllerRole);
+                    deviceType = (trackingData.role_ == vr::TrackedControllerRole_LeftHand) ? VRDEVICE_CONTROLLER_LEFT : VRDEVICE_CONTROLLER_RIGHT;
+                }
+
+                URHO3D_LOGINFOF("VR device %d of type %d disconnected", nDevice, deviceType);
+
+                deviceTrackingDataFromIndex.Erase(nDevice);
+
+                // Device disconnected
+                using namespace VRDeviceDisconnected;
+
+                SendDeviceEvent(E_VRDEVICEDISCONNECTED, deviceType, VRTRACKING_INVALID);
+            }
+            else
+            {
+                // Device connected
+                if (trackedDevicePose.eTrackingResult != trackingData.result_)
+                {
+                    // Tracking changed
+                    URHO3D_LOGINFOF("VR device %d tracking changed from %d to %d", nDevice, trackingData.result_, trackedDevicePose.eTrackingResult);
+
+                    deviceTrackingDataFromIndex[nDevice].result_ = trackedDevicePose.eTrackingResult;
+
+                    using namespace VRDeviceTrackingChanged;
+
+                    SendDeviceEvent(E_VRDEVICETRACKINGCHANGED, deviceType, VRTrackingResult(trackedDevicePose.eTrackingResult));
+                }
+            }
+        }
+        else
+        {
+            // Device is not known
+            if (trackedDevicePose.bDeviceIsConnected && deviceType != VRDEVICE_INVALID)
+            {
+                URHO3D_LOGINFOF("VR device %d of type %d connected", nDevice, deviceType);
+
+                // Valid device newly connected
+                trackingData.index_ = nDevice;
+                trackingData.class_ = deviceClass;
+                trackingData.role_ = controllerRole;
+                trackingData.result_ = vr::TrackingResult_Uninitialized;
+
+                deviceTrackingDataFromIndex[nDevice] = trackingData;
+
+                using namespace VRDeviceConnected;
+
+                SendDeviceEvent(E_VRDEVICECONNECTED, deviceType, VRTRACKING_INVALID);
+            }
+        }
+
+        if (trackedDevicePose.bDeviceIsConnected && trackedDevicePose.bPoseIsValid && deviceType != VRDEVICE_INVALID)
+        {
+            VRFromDevice_[deviceType - 1] = OpenVRAffineTransformToMatrix3x4(trackedDevicePose.mDeviceToAbsoluteTracking);
+            deviceFrame_[deviceType - 1] = currentFrame_;
+
+            switch (deviceType)
+            {
+            case VRDEVICE_HMD:
+                if (HMDNode_)
+                {
+                    HMDNode_->SetTransform(worldFromVR_ * VRFromDevice_[deviceType - 1]);
+                }
+                break;
+            }
+
+            // Send pose updated for rendering event
+            {
+                using namespace VRDevicePoseUpdatedForRendering;
+
+                VariantMap& eventData = GetEventDataMap();
+
+                eventData[P_DEVICETYPE] = deviceType;
+
+                SendEvent(E_VRDEVICEPOSEUPDATEDFORRENDERING, eventData);
+            }
+        }
     }
 
-    posesUpdatedThisFrame_ = true;
+    posesUpdatedFrame_ = currentFrame_;
+}
+
+void VR::SendDeviceEvent(StringHash eventType, VRDeviceType deviceType, VRTrackingResult trackingResult)
+{
+    using namespace VRDeviceConnected;
+
+    VariantMap& eventData = GetEventDataMap();
+
+    eventData[P_DEVICETYPE] = deviceType;
+    eventData[P_TRACKINGRESULT] = trackingResult;
+
+    SendEvent(eventType, eventData);
 }
 
 void VR::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
@@ -354,23 +470,18 @@ void VR::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
     using namespace BeginFrame;
 
     currentFrame_ = eventData[P_FRAMENUMBER].GetUInt();
-    posesUpdatedThisFrame_ = false;
 
     const bool HMDCreatedAndSceneDestroyed = (HMDNode_ && !scene_);
     if (renderParamsDirty_ || HMDCreatedAndSceneDestroyed)
     {
         if (HMDNode_)
         {
-            UnsubscribeFromViewEvents();
-
             DestroyHMDNodeAndTextures();
         }
 
         if (vrImpl_->vrSystem_ && scene_)
         {
             CreateHMDNodeAndTextures();
-
-            SubscribeToViewEvents();
         }
 
         renderParamsDirty_ = false;
@@ -395,6 +506,9 @@ void VR::HandleEndViewRender(StringHash eventType, VariantMap& eventData)
     using namespace EndViewRender;
 
     Texture2D* texture = static_cast<Texture2D*>(eventData[P_TEXTURE].GetPtr());
+
+    if (!texture)
+        return;
 
     int textureIndex = -1;
     for (int eye = 0; eye < 2; ++eye)
