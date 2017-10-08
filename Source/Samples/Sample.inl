@@ -41,8 +41,9 @@
 #include <Urho3D/UI/UI.h>
 #include <Urho3D/Resource/XMLFile.h>
 #include <Urho3D/IO/Log.h>
-#include <Urho3D/Graphics/GraphicsEvents.h>
 #include <Urho3D/VR/VR.h>
+#include <Urho3D/Graphics/Model.h>
+#include <Urho3D/Graphics/StaticModel.h>
 
 Sample::Sample(Context* context) :
     Application(context),
