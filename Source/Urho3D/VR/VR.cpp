@@ -11,7 +11,7 @@
 #include "../IO/Log.h"
 #include "../Scene/Scene.h"
 
-// hack.cb fix OpenVR C++ static lib exports
+// Match OpenVR C++ static lib exports
 #define VR_API_EXPORT 1
 #include <openvr/openvr.h>
 
@@ -28,6 +28,7 @@ namespace
 
     Urho3D::Matrix3x4 OpenVRAffineTransformToMatrix3x4(vr::HmdMatrix34_t const& in)
     {
+        // See David Eberly "Conversion of Left-Handed Coordinates to Right - Handed Coordinates"
         return Urho3D::Matrix3x4(
              in.m[0][0],  in.m[0][1], -in.m[0][2],  in.m[0][3],
              in.m[1][0],  in.m[1][1], -in.m[1][2],  in.m[1][3],
@@ -37,7 +38,7 @@ namespace
 
     Urho3D::Matrix4 OpenVRProjectionToMatrix4(vr::HmdMatrix44_t const& in)
     {
-#if 0
+        /*
         float l, r, t, b, zn = 0.1f, zf = 30.f;
         vrSystem_->GetProjectionRaw(static_cast<vr::EVREye>(eye), &l, &r, &t, &b);
 
@@ -61,7 +62,8 @@ namespace
         vrData_->eyeProjection_[eye].m31_ = 0;
         vrData_->eyeProjection_[eye].m32_ = 1;
         vrData_->eyeProjection_[eye].m33_ = 0;
-#endif
+        */
+        // Negate Z-column for RH to LH projection
         return Urho3D::Matrix4(
             in.m[0][0], in.m[0][1], -in.m[0][2], in.m[0][3],
             in.m[1][0], in.m[1][1], -in.m[1][2], in.m[1][3],
