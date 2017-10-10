@@ -29,6 +29,7 @@ namespace Urho3D
 {
 
 class Node;
+class RenderPath;
 class Scene;
 class Sprite;
 
@@ -90,6 +91,12 @@ protected:
     /// Mouse mode option to use in the sample.
     MouseMode useMouseMode_;
 
+    SharedPtr<Node> HMDNode_;
+
+    SharedPtr<Texture2D> cameraTextures_[2];
+
+    Matrix3x4 worldFromVR_;
+
     Node* VRControllerNode_[2];
 
 private:
@@ -99,6 +106,10 @@ private:
     void SetWindowTitleAndIcon();
     /// Create console and debug HUD.
     void CreateConsoleAndDebugHud();
+
+    void CreateHMDNodeAndTextures(float nearClip, float farClip, RenderPath* renderPath);
+
+    void DestroyHMDNodeAndTextures();
     /// Handle request for mouse mode on web platform.
     void HandleMouseModeRequest(StringHash eventType, VariantMap& eventData);
     /// Handle request for mouse mode change on web platform.
@@ -117,6 +128,8 @@ private:
     void HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventData);
     /// Handle VR device pose updated for rendering to update controller display
     void HandleVRDevicePoseUpdatedForRendering(StringHash eventType, VariantMap& eventData);
+    /// Handle VR texture submission
+    void HandleEndRendering(StringHash eventType, VariantMap& eventData);
 
     /// Screen joystick index for navigational controls (mobile platforms only).
     unsigned screenJoystickIndex_;

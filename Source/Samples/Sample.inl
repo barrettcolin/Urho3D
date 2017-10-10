@@ -41,9 +41,10 @@
 #include <Urho3D/UI/UI.h>
 #include <Urho3D/Resource/XMLFile.h>
 #include <Urho3D/IO/Log.h>
-#include <Urho3D/VR/VR.h>
+#include <Urho3D/Graphics/GraphicsEvents.h>
 #include <Urho3D/Graphics/Model.h>
 #include <Urho3D/Graphics/StaticModel.h>
+#include <Urho3D/VR/VR.h>
 
 Sample::Sample(Context* context) :
     Application(context),
@@ -107,6 +108,8 @@ void Sample::Start()
     SubscribeToEvent(E_VRDEVICEDISCONNECTED, URHO3D_HANDLER(Sample, HandleVRDeviceDisconnected));
     // Subscribe VR device pose updated for rendering event
     SubscribeToEvent(E_VRDEVICEPOSEUPDATEDFORRENDERING, URHO3D_HANDLER(Sample, HandleVRDevicePoseUpdatedForRendering));
+    // Subscribe end rendering event
+    SubscribeToEvent(E_ENDRENDERING, URHO3D_HANDLER(Sample, HandleEndRendering));
 #endif
 }
 
@@ -229,6 +232,66 @@ void Sample::CreateConsoleAndDebugHud()
     debugHud->SetDefaultStyle(xmlFile);
 }
 
+void Sample::CreateHMDNodeAndTextures(float nearClip, float farClip, RenderPath* renderPath)
+{
+#if defined(URHO3D_VR)
+    VR* vr = GetSubsystem<VR>();
+
+    unsigned textureWidth, textureHeight;
+    vr->GetRecommendedRenderTargetSize(textureWidth, textureHeight);
+
+    HMDNode_ = new Node(context_);
+
+    for (int eye = 0; eye < 2; ++eye)
+    {
+        // Create texture
+        cameraTextures_[eye] = new Texture2D(context_);
+        cameraTextures_[eye]->SetSize(textureWidth, textureHeight, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+        cameraTextures_[eye]->SetFilterMode(FILTER_BILINEAR);
+
+        // Set render surface to always update
+        RenderSurface* surface = cameraTextures_[eye]->GetRenderSurface();
+        surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
+
+        // Create camera node
+        Node* cameraNode = HMDNode_->CreateChild(0 == eye ? "LeftEye" : "RightEye");
+        {
+            Matrix3x4 headFromEye;
+            vr->GetHeadFromEyeTransform(VREye(eye), headFromEye);
+
+            cameraNode->SetTransform(headFromEye);
+
+            // Create camera component
+            Camera* eyeCamera = cameraNode->CreateComponent<Camera>();
+            {
+                Matrix4 proj;
+                vr->GetEyeProjection(VREye(eye), nearClip, farClip, proj);
+                eyeCamera->SetProjection(proj);
+
+                // Set scene camera viewport
+                SharedPtr<Viewport> eyeViewport(new Viewport(context_, scene_, eyeCamera));
+
+                // Set viewport render path
+                eyeViewport->SetRenderPath(renderPath);
+
+                surface->SetViewport(0, eyeViewport);
+            }
+        }
+    }
+#endif
+}
+
+void Sample::DestroyHMDNodeAndTextures()
+{
+#if defined(URHO3D_VR)
+    HMDNode_ = 0;
+
+    for (int eye = 0; eye < 2; ++eye)
+    {
+        cameraTextures_[eye] = 0;
+    }
+#endif
+}
 
 void Sample::HandleKeyUp(StringHash /*eventType*/, VariantMap& eventData)
 {
@@ -443,18 +506,10 @@ void Sample::HandleVRDeviceConnected(StringHash eventType, VariantMap& eventData
             Camera* camera = cameraNode_->GetComponent<Camera>();
             if (camera)
             {
-                VR* vr = GetSubsystem<VR>();
                 Renderer* renderer = GetSubsystem<Renderer>();
+                CreateHMDNodeAndTextures(camera->GetNearClip(), camera->GetFarClip(), renderer->GetViewport(0)->GetRenderPath());
 
-                vr->SetNearClip(camera->GetNearClip());
-
-                vr->SetFarClip(camera->GetFarClip());
-
-                vr->SetRenderPath(renderer->GetViewport(0)->GetRenderPath());
-
-                vr->SetScene(scene_);
-
-                vr->SetWorldFromVRTransform(Matrix3x4(cameraNode_->GetPosition(), Quaternion::IDENTITY, 1.0f));
+                worldFromVR_ = Matrix3x4(cameraNode_->GetPosition(), Quaternion::IDENTITY, 1.0f);
             }
         }
         break;
@@ -495,11 +550,7 @@ void Sample::HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventD
     switch (deviceType)
     {
     case VRDEVICE_HMD:
-        {
-            VR* vr = GetSubsystem<VR>();
-
-            vr->SetScene(0);
-        }
+        DestroyHMDNodeAndTextures();
         break;
 
     case VRDEVICE_CONTROLLER_LEFT:
@@ -527,6 +578,14 @@ void Sample::HandleVRDevicePoseUpdatedForRendering(StringHash eventType, Variant
 
     switch (deviceType)
     {
+    case VRDEVICE_HMD:
+        if(HMDNode_)
+        {
+            VR* vr = GetSubsystem<VR>();
+            HMDNode_->SetTransform(worldFromVR_ * vr->GetTrackingFromDeviceTransform(deviceType));
+        }
+        break;
+
     case VRDEVICE_CONTROLLER_LEFT:
     case VRDEVICE_CONTROLLER_RIGHT:
         {
@@ -535,11 +594,25 @@ void Sample::HandleVRDevicePoseUpdatedForRendering(StringHash eventType, Variant
             if (VRControllerNode_[controllerIndex])
             {
                 VR* vr = GetSubsystem<VR>();
-
-                VRControllerNode_[controllerIndex]->SetTransform(vr->GetWorldFromVRTransform() * vr->GetVRFromDeviceTransform(deviceType));
+                VRControllerNode_[controllerIndex]->SetTransform(worldFromVR_ * vr->GetTrackingFromDeviceTransform(deviceType));
             }
         }
         break;
+    }
+#endif
+}
+
+void Sample::HandleEndRendering(StringHash eventType, VariantMap& eventData)
+{
+#if defined(URHO3D_VR)
+    VR* vr = GetSubsystem<VR>();
+
+    for (int eye = 0; eye < 2; ++eye)
+    {
+        if (cameraTextures_[eye])
+        {
+            vr->SubmitEyeTexture(VREye(eye), cameraTextures_[eye]);
+        }
     }
 #endif
 }

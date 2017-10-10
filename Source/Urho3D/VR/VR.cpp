@@ -19,13 +19,6 @@
 
 namespace
 {
-    const float DEFAULT_NEAR_CLIP = 0.1f;
-    const float DEFAULT_FAR_CLIP = 100.0f;
-
-    const float MIN_RENDER_RESOLUTION_SCALE = 0.25f;
-    const float MAX_RENDER_RESOLUTION_SCALE = 8.0f;
-    const float DEFAULT_RENDER_RESOLUTION_SCALE = 1.0f;
-
     Urho3D::Matrix3x4 OpenVRAffineTransformToMatrix3x4(vr::HmdMatrix34_t const& in)
     {
         // See David Eberly "Conversion of Left-Handed Coordinates to Right - Handed Coordinates"
@@ -115,19 +108,11 @@ VRImpl::VRImpl() :
 
 VR::VR(Context* context_) :
     Object(context_),
-    vrImpl_(new VRImpl()),
-    renderResolutionScale_(DEFAULT_RENDER_RESOLUTION_SCALE),
-    nearClip_(DEFAULT_NEAR_CLIP),
-    farClip_(DEFAULT_FAR_CLIP),
-    renderParamsDirty_(false),
-    currentFrame_(0),
-    posesUpdatedFrame_(0)
+    vrImpl_(new VRImpl())
 {
     if (InitializeVR() == 0)
     {
-        SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(VR, HandleBeginFrame));
-
-        SubscribeToViewEvents();
+        SubscribeToEvent(E_BEGINRENDERING, URHO3D_HANDLER(VR, HandleBeginRendering));
     }
 }
 
@@ -136,85 +121,30 @@ VR::~VR()
     ShutdownVR();
 }
 
-void VR::SetRenderResolutionScale(float renderResolutionScale)
+void VR::GetRecommendedRenderTargetSize(unsigned& widthOut, unsigned& heightOut) const
 {
-    const float clampedScale = Clamp(renderResolutionScale, MIN_RENDER_RESOLUTION_SCALE, MAX_RENDER_RESOLUTION_SCALE);
-    const bool usedClampedScale = (clampedScale != renderResolutionScale);
-    if (renderResolutionScale_ != clampedScale)
-    {
-        renderResolutionScale_ = clampedScale;
-        renderParamsDirty_ = true;
-
-        if (usedClampedScale)
-        {
-            URHO3D_LOGERRORF("VR renderResolutionScale %f was clamped to %f in valid range [%f, %f]",
-                renderResolutionScale,
-                clampedScale,
-                MIN_RENDER_RESOLUTION_SCALE,
-                MAX_RENDER_RESOLUTION_SCALE);
-        }
-    }
+    assert(vrImpl_->vrSystem_);
+    vrImpl_->vrSystem_->GetRecommendedRenderTargetSize(&widthOut, &heightOut);
 }
 
-void VR::SetNearClip(float nearClip)
+void VR::GetEyeProjection(VREye eye, float nearClip, float farClip, Matrix4& projOut) const
 {
-    const float clampedClip = Max(nearClip, M_MIN_NEARCLIP);
-    const bool usedClampedClip = nearClip != clampedClip;
-    if (nearClip_ != clampedClip)
-    {
-        nearClip_ = clampedClip;
-        renderParamsDirty_ = true;
-
-        if (usedClampedClip)
-        {
-            URHO3D_LOGERRORF("VR nearClip %f was clamped to %f", nearClip, clampedClip);
-        }
-    }
+    assert(eye >= VREYE_LEFT && eye < NUM_EYES);
+    assert(vrImpl_->vrSystem_);
+    projOut = OpenVRProjectionToMatrix4(vrImpl_->vrSystem_->GetProjectionMatrix(vr::EVREye(eye), nearClip, farClip));
 }
 
-void VR::SetFarClip(float farClip)
+void VR::GetHeadFromEyeTransform(VREye eye, Matrix3x4& headFromEyeOut) const
 {
-    const float clampedClip = Max(farClip, M_MIN_NEARCLIP);
-    const bool usedClampedClip = farClip != clampedClip;
-    if (farClip_ != clampedClip)
-    {
-        farClip_ = clampedClip;
-        renderParamsDirty_ = true;
-
-        if (usedClampedClip)
-        {
-            URHO3D_LOGERRORF("VR farClip %f was clamped to %f", farClip, clampedClip);
-        }
-    }
+    assert(eye >= VREYE_LEFT && eye < NUM_EYES);
+    assert(vrImpl_->vrSystem_);
+    headFromEyeOut = OpenVRAffineTransformToMatrix3x4(vrImpl_->vrSystem_->GetEyeToHeadTransform(vr::EVREye(eye)));
 }
 
-void VR::SetRenderPath(RenderPath* renderPath)
-{
-    if (renderPath_ != renderPath)
-    {
-        renderPath_ = renderPath;
-        renderParamsDirty_ = true;
-    }
-}
-
-void VR::SetScene(Scene* scene)
-{
-    if (scene_ != scene)
-    {
-        scene_ = scene;
-        renderParamsDirty_ = true;
-    }
-}
-
-void VR::SetWorldFromVRTransform(const Matrix3x4& worldFromVR)
-{
-    worldFromVR_ = worldFromVR;
-}
-
-const Matrix3x4& VR::GetVRFromDeviceTransform(VRDeviceType vrDevice) const
+const Matrix3x4& VR::GetTrackingFromDeviceTransform(VRDeviceType vrDevice) const
 {
     assert(vrDevice > VRDEVICE_INVALID && vrDevice < NUM_VR_DEVICE_TYPES);
-    return VRFromDevice_[vrDevice - 1];
+    return trackingFromDevice_[vrDevice - 1];
 }
 
 int VR::InitializeVR()
@@ -242,90 +172,48 @@ void VR::ShutdownVR()
     vrImpl_ = 0;
 }
 
-void VR::CreateHMDNodeAndTextures()
+void VR::SendDeviceEvent(StringHash eventType, VRDeviceType deviceType, VRTrackingResult trackingResult)
 {
-    unsigned renderWidth, renderHeight;
-    vrImpl_->vrSystem_->GetRecommendedRenderTargetSize(&renderWidth, &renderHeight);
+    using namespace VRDeviceConnected;
 
-    const int textureWidth = int(renderWidth * renderResolutionScale_);
-    const int textureHeight = int(renderHeight * renderResolutionScale_);
+    VariantMap& eventData = GetEventDataMap();
 
-    URHO3D_LOGINFOF("VR initializing with %dx%d eye textures", textureWidth, textureHeight);
-    HMDNode_ = new Node(context_);
+    eventData[P_DEVICETYPE] = deviceType;
+    eventData[P_TRACKINGRESULT] = trackingResult;
 
-    for (int eye = 0; eye < 2; ++eye)
+    SendEvent(eventType, eventData);
+}
+
+void VR::SubmitEyeTexture(VREye eye, Texture2D* texture)
+{
+    assert(eye == VREYE_LEFT || eye == VREYE_RIGHT);
+
+    vr::Texture_t vrTex;
     {
-        // Create texture
-        cameraTextures_[eye] = new Texture2D(context_);
-        cameraTextures_[eye]->SetSize(textureWidth, textureHeight, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
-        cameraTextures_[eye]->SetFilterMode(FILTER_BILINEAR);
+#if defined(URHO3D_D3D11)
+        vrTex.handle = texture->GetGPUObject();
+        vrTex.eType = vr::TextureType_DirectX;
+#elif defined(URHO3D_OPENGL)
+        // todo.cb OpenGL textures are upside down
+        intptr_t textureName = texture->GetGPUObjectName();
+        vrTex.handle = reinterpret_cast<void*&>(textureName);
+        vrTex.eType = vr::TextureType_OpenGL;
+#else
+#error Unsupported VR graphics API!
+#endif
+        vrTex.eColorSpace = vr::ColorSpace_Auto;
+    }
 
-        // Set render surface to always update
-        RenderSurface* surface = cameraTextures_[eye]->GetRenderSurface();
-        surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
+    vr::EVRCompositorError err = vr::VRCompositor()->Submit(vr::EVREye(eye), &vrTex);
 
-        // Create camera node
-        Node* cameraNode = HMDNode_->CreateChild(0 == eye ? "LeftEye" : "RightEye");
-        {
-            // Set head from eye transform
-            vr::HmdMatrix34_t vrHeadFromEye = vrImpl_->vrSystem_->GetEyeToHeadTransform(vr::EVREye(eye));
-
-            Matrix3x4 headFromEye = OpenVRAffineTransformToMatrix3x4(vrHeadFromEye);
-
-            cameraNode->SetTransform(headFromEye);
-
-            // Create camera component
-            Camera* eyeCamera = cameraNode->CreateComponent<Camera>();
-            {
-                // Set projection
-                vr::HmdMatrix44_t vrProj = vrImpl_->vrSystem_->GetProjectionMatrix(vr::EVREye(eye), nearClip_, farClip_);
-
-                Matrix4 proj = OpenVRProjectionToMatrix4(vrProj);
-
-                eyeCamera->SetProjection(proj);
-
-                // Set scene camera viewport
-                SharedPtr<Viewport> eyeViewport(new Viewport(context_, scene_, eyeCamera));
-
-                // Set viewport render path
-                if (renderPath_)
-                {
-                    eyeViewport->SetRenderPath(renderPath_);
-                }
-
-                surface->SetViewport(0, eyeViewport);   
-            }
-        }
+    if (err != vr::VRCompositorError_None)
+    {
+        URHO3D_LOGERRORF("vr::VRCompositor()->Submit failed with code: %d", err);
     }
 }
 
-void VR::DestroyHMDNodeAndTextures()
+void VR::HandleBeginRendering(StringHash eventType, VariantMap& eventData)
 {
-    HMDNode_.Reset();
-
-    for (int eye = 0; eye < 2; ++eye)
-    {
-        cameraTextures_[eye].Reset();
-    }
-}
-
-void VR::SubscribeToViewEvents()
-{
-    SubscribeToEvent(E_BEGINVIEWUPDATE, URHO3D_HANDLER(VR, HandleBeginViewUpdate));
-    SubscribeToEvent(E_ENDVIEWRENDER, URHO3D_HANDLER(VR, HandleEndViewRender));
-}
-
-void VR::UnsubscribeFromViewEvents()
-{
-    UnsubscribeFromEvent(E_ENDVIEWUPDATE);
-    UnsubscribeFromEvent(E_BEGINVIEWUPDATE);
-}
-
-void VR::UpdatePosesThisFrame()
-{
-    if (posesUpdatedFrame_ == currentFrame_)
-        return;
-
     vr::TrackedDevicePose_t trackedDevicePoses[vr::k_unMaxTrackedDeviceCount];
     vr::VRCompositor()->WaitGetPoses(trackedDevicePoses, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
@@ -426,125 +314,15 @@ void VR::UpdatePosesThisFrame()
 
         if (trackedDevicePose.bDeviceIsConnected && trackedDevicePose.bPoseIsValid && deviceType != VRDEVICE_INVALID)
         {
-            VRFromDevice_[deviceType - 1] = OpenVRAffineTransformToMatrix3x4(trackedDevicePose.mDeviceToAbsoluteTracking);
-            deviceFrame_[deviceType - 1] = currentFrame_;
+            trackingFromDevice_[deviceType - 1] = OpenVRAffineTransformToMatrix3x4(trackedDevicePose.mDeviceToAbsoluteTracking);
 
-            switch (deviceType)
-            {
-            case VRDEVICE_HMD:
-                if (HMDNode_)
-                {
-                    HMDNode_->SetTransform(worldFromVR_ * VRFromDevice_[deviceType - 1]);
-                }
-                break;
-            }
+            using namespace VRDevicePoseUpdatedForRendering;
 
-            // Send pose updated for rendering event
-            {
-                using namespace VRDevicePoseUpdatedForRendering;
+            VariantMap& eventData = GetEventDataMap();
 
-                VariantMap& eventData = GetEventDataMap();
+            eventData[P_DEVICETYPE] = deviceType;
 
-                eventData[P_DEVICETYPE] = deviceType;
-
-                SendEvent(E_VRDEVICEPOSEUPDATEDFORRENDERING, eventData);
-            }
-        }
-    }
-
-    posesUpdatedFrame_ = currentFrame_;
-}
-
-void VR::SendDeviceEvent(StringHash eventType, VRDeviceType deviceType, VRTrackingResult trackingResult)
-{
-    using namespace VRDeviceConnected;
-
-    VariantMap& eventData = GetEventDataMap();
-
-    eventData[P_DEVICETYPE] = deviceType;
-    eventData[P_TRACKINGRESULT] = trackingResult;
-
-    SendEvent(eventType, eventData);
-}
-
-void VR::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
-{
-    using namespace BeginFrame;
-
-    currentFrame_ = eventData[P_FRAMENUMBER].GetUInt();
-
-    const bool HMDCreatedAndSceneDestroyed = (HMDNode_ && !scene_);
-    if (renderParamsDirty_ || HMDCreatedAndSceneDestroyed)
-    {
-        if (HMDNode_)
-        {
-            DestroyHMDNodeAndTextures();
-        }
-
-        if (vrImpl_->vrSystem_ && scene_)
-        {
-            CreateHMDNodeAndTextures();
-        }
-
-        renderParamsDirty_ = false;
-    }
-}
-
-void VR::HandleBeginViewUpdate(StringHash eventType, VariantMap& eventData)
-{
-    using namespace BeginViewUpdate;
-
-    Texture2D* texture = static_cast<Texture2D*>(eventData[P_TEXTURE].GetPtr());
-
-    // Might get BeginViewUpdate for some other view, only update poses if texture is one of two we want to update this frame
-    if (texture == cameraTextures_[0] || texture == cameraTextures_[1])
-    {
-        UpdatePosesThisFrame();
-    }
-}
-
-void VR::HandleEndViewRender(StringHash eventType, VariantMap& eventData)
-{
-    using namespace EndViewRender;
-
-    Texture2D* texture = static_cast<Texture2D*>(eventData[P_TEXTURE].GetPtr());
-
-    if (!texture)
-        return;
-
-    int textureIndex = -1;
-    for (int eye = 0; eye < 2; ++eye)
-    {
-        if (cameraTextures_[eye] == texture)
-        {
-            textureIndex = eye;
-            break;
-        }
-    }
-
-    if (textureIndex >= 0)
-    {
-        vr::Texture_t vrTex;
-        {
-#if defined(URHO3D_D3D11)
-            vrTex.handle = texture->GetGPUObject();
-            vrTex.eType = vr::TextureType_DirectX;
-#elif defined(URHO3D_OPENGL)
-            // todo.cb OpenGL textures are upside down
-            intptr_t textureName = texture->GetGPUObjectName();
-            vrTex.handle = reinterpret_cast<void*&>(textureName);
-            vrTex.eType = vr::TextureType_OpenGL;
-#else
-#error Unsupported VR graphics API!
-#endif
-            vrTex.eColorSpace = vr::ColorSpace_Auto;
-        }
-
-        vr::EVRCompositorError err = vr::VRCompositor()->Submit(vr::EVREye(textureIndex), &vrTex);
-
-        if (err != vr::VRCompositorError_None)
-        {
-            URHO3D_LOGERRORF("vr::VRCompositor()->Submit failed with code: %d", err);
+            SendEvent(E_VRDEVICEPOSEUPDATEDFORRENDERING, eventData);
         }
     }
 }
