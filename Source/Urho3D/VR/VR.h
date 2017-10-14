@@ -36,13 +36,12 @@ class VRImpl;
 
 enum VRDeviceType
 {
-    VRDEVICE_INVALID = 0,
-    VRDEVICE_HMD,
+    VRDEVICE_INVALID = -1,
+    VRDEVICE_HMD = 0,
     VRDEVICE_CONTROLLER_LEFT,
     VRDEVICE_CONTROLLER_RIGHT,
 
-    NUM_VR_DEVICE_TYPES,
-    NUM_VALID_VR_DEVICE_TYPES = NUM_VR_DEVICE_TYPES - 1
+    NUM_VR_DEVICE_TYPES
 };
 
 enum VRTrackingResult
@@ -96,7 +95,7 @@ private:
 
     VRImpl* vrImpl_;
 
-    Matrix3x4 trackingFromDevice_[NUM_VALID_VR_DEVICE_TYPES];
+    Matrix3x4 trackingFromDevice_[NUM_VR_DEVICE_TYPES];
 };
 
 }

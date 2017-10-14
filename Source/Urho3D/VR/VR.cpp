@@ -17,55 +17,6 @@
 
 #include "../DebugNew.h"
 
-namespace
-{
-    Urho3D::Matrix3x4 OpenVRAffineTransformToMatrix3x4(vr::HmdMatrix34_t const& in)
-    {
-        // See David Eberly "Conversion of Left-Handed Coordinates to Right - Handed Coordinates"
-        return Urho3D::Matrix3x4(
-             in.m[0][0],  in.m[0][1], -in.m[0][2],  in.m[0][3],
-             in.m[1][0],  in.m[1][1], -in.m[1][2],  in.m[1][3],
-            -in.m[2][0], -in.m[2][1],  in.m[2][2], -in.m[2][3]
-        );
-    }
-
-    Urho3D::Matrix4 OpenVRProjectionToMatrix4(vr::HmdMatrix44_t const& in)
-    {
-        /*
-        float l, r, t, b, zn = 0.1f, zf = 30.f;
-        vrSystem_->GetProjectionRaw(static_cast<vr::EVREye>(eye), &l, &r, &t, &b);
-
-        // D3DXMatrixPerspectiveOffCenterLH
-        vrData_->eyeProjection_[eye].m00_ = 2.0f / (r - l);
-        vrData_->eyeProjection_[eye].m01_ = 0;
-        vrData_->eyeProjection_[eye].m02_ = (l + r) / (l - r);
-        vrData_->eyeProjection_[eye].m03_ = 0;
-
-        vrData_->eyeProjection_[eye].m10_ = 0;
-        vrData_->eyeProjection_[eye].m11_ = 2.0f / (b - t);
-        vrData_->eyeProjection_[eye].m12_ = (t + b) / (b - t);
-        vrData_->eyeProjection_[eye].m13_ = 0;
-
-        vrData_->eyeProjection_[eye].m20_ = 0;
-        vrData_->eyeProjection_[eye].m21_ = 0;
-        vrData_->eyeProjection_[eye].m22_ = zf / (zf - zn);
-        vrData_->eyeProjection_[eye].m23_ = zn * zf / (zn - zf);
-
-        vrData_->eyeProjection_[eye].m30_ = 0;
-        vrData_->eyeProjection_[eye].m31_ = 0;
-        vrData_->eyeProjection_[eye].m32_ = 1;
-        vrData_->eyeProjection_[eye].m33_ = 0;
-        */
-        // Negate Z-column for RH to LH projection
-        return Urho3D::Matrix4(
-            in.m[0][0], in.m[0][1], -in.m[0][2], in.m[0][3],
-            in.m[1][0], in.m[1][1], -in.m[1][2], in.m[1][3],
-            in.m[2][0], in.m[2][1], -in.m[2][2], in.m[2][3],
-            in.m[3][0], in.m[3][1], -in.m[3][2], in.m[3][3]
-        );
-    }
-}
-
 namespace Urho3D
 {
 
@@ -93,6 +44,12 @@ public:
 
     DeviceTrackingDataFromIndex& AccessDeviceTrackingDataFromIndex() { return trackingResultFromDeviceIndex_; }
 
+public:
+    /// Convert OpenVR pose transform to Urho
+    static Urho3D::Matrix3x4 UrhoAffineTransformFromOpenVR(vr::HmdMatrix34_t const& in);
+    /// Convert OpenVR eye projection to Urho
+    static Urho3D::Matrix4 UrhoProjectionFromOpenVR(vr::HmdMatrix44_t const& in);
+
 private:
     /// OpenVR VRSystem interface
     vr::IVRSystem* vrSystem_;
@@ -104,6 +61,38 @@ VRImpl::VRImpl() :
     vrSystem_(0)
 {
 
+}
+
+// Urho scene transforms are X-right/Y-up/Z-forward, OpenVR poses are X-right/Y-up/Z-backward
+//
+// ovrFromUrho is:  1  0  0  0
+//                  0  1  0  0
+//                  0  0 -1  0
+//                  0  0  0  1
+//
+// scene transforms have Urho input, Urho output, so OVR poses require change of basis:
+// urhoOut = (urhoFromOVR * OVRpose * OVRFromUrho) * urhoIn
+// See also: David Eberly "Conversion of Left-Handed Coordinates to Right - Handed Coordinates"
+//
+// projections have Urho input, clip output (same clip as OVR), so OVR projections require reflection:
+// clipOut = (OVRprojection * ovrFromUrho) * urhoIn
+Urho3D::Matrix3x4 VRImpl::UrhoAffineTransformFromOpenVR(vr::HmdMatrix34_t const& in)
+{
+    return Urho3D::Matrix3x4(
+        in.m[0][0], in.m[0][1], -in.m[0][2], in.m[0][3],
+        in.m[1][0], in.m[1][1], -in.m[1][2], in.m[1][3],
+        -in.m[2][0], -in.m[2][1], in.m[2][2], -in.m[2][3]
+    );
+}
+
+Urho3D::Matrix4 VRImpl::UrhoProjectionFromOpenVR(vr::HmdMatrix44_t const& in)
+{
+    return Urho3D::Matrix4(
+        in.m[0][0], in.m[0][1], -in.m[0][2], in.m[0][3],
+        in.m[1][0], in.m[1][1], -in.m[1][2], in.m[1][3],
+        in.m[2][0], in.m[2][1], -in.m[2][2], in.m[2][3],
+        in.m[3][0], in.m[3][1], -in.m[3][2], in.m[3][3]
+    );
 }
 
 VR::VR(Context* context_) :
@@ -131,20 +120,20 @@ void VR::GetEyeProjection(VREye eye, float nearClip, float farClip, Matrix4& pro
 {
     assert(eye >= VREYE_LEFT && eye < NUM_EYES);
     assert(vrImpl_->vrSystem_);
-    projOut = OpenVRProjectionToMatrix4(vrImpl_->vrSystem_->GetProjectionMatrix(vr::EVREye(eye), nearClip, farClip));
+    projOut = VRImpl::UrhoProjectionFromOpenVR(vrImpl_->vrSystem_->GetProjectionMatrix(vr::EVREye(eye), nearClip, farClip));
 }
 
 void VR::GetHeadFromEyeTransform(VREye eye, Matrix3x4& headFromEyeOut) const
 {
     assert(eye >= VREYE_LEFT && eye < NUM_EYES);
     assert(vrImpl_->vrSystem_);
-    headFromEyeOut = OpenVRAffineTransformToMatrix3x4(vrImpl_->vrSystem_->GetEyeToHeadTransform(vr::EVREye(eye)));
+    headFromEyeOut = VRImpl::UrhoAffineTransformFromOpenVR(vrImpl_->vrSystem_->GetEyeToHeadTransform(vr::EVREye(eye)));
 }
 
 const Matrix3x4& VR::GetTrackingFromDeviceTransform(VRDeviceType vrDevice) const
 {
-    assert(vrDevice > VRDEVICE_INVALID && vrDevice < NUM_VR_DEVICE_TYPES);
-    return trackingFromDevice_[vrDevice - 1];
+    assert(vrDevice >= 0 && vrDevice < NUM_VR_DEVICE_TYPES);
+    return trackingFromDevice_[vrDevice];
 }
 
 int VR::InitializeVR()
@@ -314,7 +303,7 @@ void VR::HandleBeginRendering(StringHash eventType, VariantMap& eventData)
 
         if (trackedDevicePose.bDeviceIsConnected && trackedDevicePose.bPoseIsValid && deviceType != VRDEVICE_INVALID)
         {
-            trackingFromDevice_[deviceType - 1] = OpenVRAffineTransformToMatrix3x4(trackedDevicePose.mDeviceToAbsoluteTracking);
+            trackingFromDevice_[deviceType] = VRImpl::UrhoAffineTransformFromOpenVR(trackedDevicePose.mDeviceToAbsoluteTracking);
 
             using namespace VRDevicePoseUpdatedForRendering;
 
