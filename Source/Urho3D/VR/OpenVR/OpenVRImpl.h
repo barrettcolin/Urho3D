@@ -34,6 +34,8 @@ public:
 public:
     /// Construct.
     VRImpl();
+    /// Destruct.
+    ~VRImpl();
 
     DeviceTrackingDataFromIndex& AccessDeviceTrackingDataFromIndex() { return trackingResultFromDeviceIndex_; }
 

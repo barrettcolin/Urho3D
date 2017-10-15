@@ -83,10 +83,6 @@ public:
 
 private:
 
-    int InitializeVR();
-
-    void ShutdownVR();
-
     void SendDeviceEvent(StringHash eventType, VRDeviceType deviceType, VRTrackingResult trackingResult);
 
     void HandleBeginRendering(StringHash eventType, VariantMap& eventData);

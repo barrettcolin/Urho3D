@@ -2,15 +2,31 @@
 
 #include "OpenVRImpl.h"
 
+#include "../../IO/Log.h"
+
 #include "../../DebugNew.h"
 
 namespace Urho3D
 {
 
-VRImpl::VRImpl() :
-    vrSystem_(0)
+VRImpl::VRImpl()
 {
+    vr::EVRInitError err;
+    vrSystem_ = vr::VR_Init(&err, vr::VRApplication_Scene);
 
+    if (err != vr::VRInitError_None)
+    {
+        URHO3D_LOGERRORF("vr::VR_Init failed with error %d", err);
+    }
+}
+
+VRImpl::~VRImpl()
+{
+    if (vrSystem_)
+    {
+        vr::VR_Shutdown();
+        vrSystem_ = 0;
+    }
 }
 
 // Urho scene transforms are X-right/Y-up/Z-forward, OpenVR poses are X-right/Y-up/Z-backward

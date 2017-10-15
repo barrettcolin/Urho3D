@@ -22,7 +22,7 @@ VR::VR(Context* context_) :
     Object(context_),
     vrImpl_(new VRImpl())
 {
-    if (InitializeVR() == 0)
+    if (vrImpl_->vrSystem_)
     {
         SubscribeToEvent(E_BEGINRENDERING, URHO3D_HANDLER(VR, HandleBeginRendering));
     }
@@ -30,7 +30,7 @@ VR::VR(Context* context_) :
 
 VR::~VR()
 {
-    ShutdownVR();
+    delete vrImpl_;
 }
 
 void VR::GetRecommendedRenderTargetSize(unsigned& widthOut, unsigned& heightOut) const
@@ -51,31 +51,6 @@ void VR::GetHeadFromEyeTransform(VREye eye, Matrix3x4& headFromEyeOut) const
     assert(eye >= VREYE_LEFT && eye < NUM_EYES);
     assert(vrImpl_->vrSystem_);
     headFromEyeOut = VRImpl::UrhoAffineTransformFromOpenVR(vrImpl_->vrSystem_->GetEyeToHeadTransform(vr::EVREye(eye)));
-}
-
-int VR::InitializeVR()
-{
-    vr::EVRInitError err;
-    vrImpl_->vrSystem_ = vr::VR_Init(&err, vr::VRApplication_Scene);
-
-    if (err != vr::VRInitError_None)
-    {
-        URHO3D_LOGERRORF("vr::VR_Init failed with error %d", err);
-    }
-
-    return err;
-}
-
-void VR::ShutdownVR()
-{
-    if (vrImpl_->vrSystem_)
-    {
-        vr::VR_Shutdown();
-        vrImpl_->vrSystem_ = 0;
-    }
-
-    delete vrImpl_;
-    vrImpl_ = 0;
 }
 
 void VR::SubmitEyeTexture(VREye eye, Texture2D* texture)
