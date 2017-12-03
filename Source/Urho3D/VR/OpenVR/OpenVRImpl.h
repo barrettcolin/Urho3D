@@ -22,14 +22,18 @@ public:
     /// DeviceTrackingData
     struct DeviceTrackingData
     {
-        unsigned index_;
-        vr::ETrackedDeviceClass class_;
-        vr::ETrackedControllerRole role_;
-        vr::ETrackingResult result_;
-    };
+        vr::TrackedDeviceIndex_t deviceIndex_;
+        vr::ETrackedDeviceClass deviceClass_;
+        vr::ETrackedControllerRole controllerRole_;
+        vr::VRControllerState001_t controllerState_;
+        Matrix3x4 trackingFromDevice_;
+        bool poseValid_;
 
-    /// DeviceTrackingDataFromIndex
-    typedef HashMap<unsigned, DeviceTrackingData> DeviceTrackingDataFromIndex;
+        /// Construct
+        DeviceTrackingData(vr::TrackedDeviceIndex_t deviceIndex = vr::k_unTrackedDeviceIndexInvalid, 
+            vr::ETrackedDeviceClass deviceClass = vr::TrackedDeviceClass_Invalid, 
+            vr::ETrackedControllerRole controllerRole = vr::TrackedControllerRole_Invalid);
+    };
 
 public:
     /// Construct.
@@ -37,19 +41,25 @@ public:
     /// Destruct.
     ~VRImpl();
 
-    DeviceTrackingDataFromIndex& AccessDeviceTrackingDataFromIndex() { return trackingResultFromDeviceIndex_; }
-
 public:
+
+    int ActivateDevice(vr::TrackedDeviceIndex_t deviceIndex);
+
+    void DeactivateDevice(vr::TrackedDeviceIndex_t deviceIndex);
     /// Convert OpenVR pose transform to Urho
-    static Urho3D::Matrix3x4 UrhoAffineTransformFromOpenVR(vr::HmdMatrix34_t const& in);
+    static void UrhoAffineTransformFromOpenVR(vr::HmdMatrix34_t const& in, Matrix3x4& out);
     /// Convert OpenVR eye projection to Urho
-    static Urho3D::Matrix4 UrhoProjectionFromOpenVR(vr::HmdMatrix44_t const& in);
+    static void UrhoProjectionFromOpenVR(vr::HmdMatrix44_t const& in, Matrix4& out);
 
 private:
+    int Initialize();
+
     /// OpenVR VRSystem interface
     vr::IVRSystem* vrSystem_;
-    /// ETrackingResult from device index
-    DeviceTrackingDataFromIndex trackingResultFromDeviceIndex_;
+
+    Vector<DeviceTrackingData> deviceTrackingData_;
+
+    HashMap<vr::TrackedDeviceIndex_t, int> implIndexFromTrackedDeviceIndex_;
 };
 
 }

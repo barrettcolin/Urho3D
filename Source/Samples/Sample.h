@@ -24,6 +24,7 @@
 
 #include <Urho3D/Engine/Application.h>
 #include <Urho3D/Input/Input.h>
+#include <Urho3D/VR/VR.h>
 
 namespace Urho3D
 {
@@ -91,14 +92,6 @@ protected:
     /// Mouse mode option to use in the sample.
     MouseMode useMouseMode_;
 
-    SharedPtr<Node> HMDNode_;
-
-    SharedPtr<Texture2D> cameraTextures_[2];
-
-    Matrix3x4 worldFromVR_;
-
-    Node* VRControllerNode_[2];
-
 private:
     /// Create logo.
     void CreateLogo();
@@ -107,9 +100,13 @@ private:
     /// Create console and debug HUD.
     void CreateConsoleAndDebugHud();
 
-    void CreateHMDNodeAndTextures(float nearClip, float farClip, RenderPath* renderPath);
+    bool TryCreateHMDNodeAndTextures();
 
     void DestroyHMDNodeAndTextures();
+
+    void CreateControllerNode(unsigned deviceId, VRControllerRole controllerRole);
+
+    void DestroyControllerNode(unsigned deviceId);
     /// Handle request for mouse mode on web platform.
     void HandleMouseModeRequest(StringHash eventType, VariantMap& eventData);
     /// Handle request for mouse mode change on web platform.
@@ -122,12 +119,14 @@ private:
     void HandleSceneUpdate(StringHash eventType, VariantMap& eventData);
     /// Handle touch begin event to initialize touch input on desktop platform.
     void HandleTouchBegin(StringHash eventType, VariantMap& eventData);
+    /// Handle VR init after sample scene and camera are created
+    void HandleBeginFrame(StringHash eventType, VariantMap& eventData);
     /// Handle VR device connected to start HMD scene rendering and respond to controller connection
     void HandleVRDeviceConnected(StringHash eventType, VariantMap& eventData);
     /// Handle VR device disconnected to stop HMD scene rendering and respond to controller disconnection
     void HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventData);
     /// Handle VR device pose updated for rendering to update controller display
-    void HandleVRDevicePoseUpdatedForRendering(StringHash eventType, VariantMap& eventData);
+    void HandleVRDevicePosesUpdatedForRendering(StringHash eventType, VariantMap& eventData);
     /// Handle VR texture submission
     void HandleEndRendering(StringHash eventType, VariantMap& eventData);
 
@@ -137,6 +136,16 @@ private:
     unsigned screenJoystickSettingsIndex_;
     /// Pause flag.
     bool paused_;
+    /// Initialize VR once.
+    bool vrInitialized_;
+
+    SharedPtr<Node> HMDNode_;
+
+    SharedPtr<Texture2D> cameraTextures_[2];
+
+    Matrix3x4 worldFromVR_;
+
+    HashMap<unsigned, WeakPtr<Node> > VRControllerNodeFromDeviceId_;
 };
 
 #include "Sample.inl"

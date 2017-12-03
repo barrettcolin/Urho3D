@@ -16,20 +16,15 @@
 namespace Urho3D
 {
 
-const Matrix3x4& VR::GetTrackingFromDeviceTransform(VRDeviceType vrDevice) const
-{
-    assert(vrDevice >= 0 && vrDevice < NUM_VR_DEVICE_TYPES);
-    return trackingFromDevice_[vrDevice];
-}
-
-void VR::SendDeviceEvent(StringHash eventType, VRDeviceType deviceType, VRTrackingResult trackingResult)
+void VR::SendDeviceConnectedEvent(StringHash eventType, unsigned deviceId, VRDeviceClass deviceClass, VRControllerRole controllerRole)
 {
     using namespace VRDeviceConnected;
 
     VariantMap& eventData = GetEventDataMap();
 
-    eventData[P_DEVICETYPE] = deviceType;
-    eventData[P_TRACKINGRESULT] = trackingResult;
+    eventData[P_DEVICEID] = deviceId;
+    eventData[P_DEVICECLASS] = deviceClass;
+    eventData[P_CONTROLLERROLE] = controllerRole;
 
     SendEvent(eventType, eventData);
 }

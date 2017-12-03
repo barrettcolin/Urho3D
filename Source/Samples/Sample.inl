@@ -54,7 +54,8 @@ Sample::Sample(Context* context) :
     useMouseMode_(MM_ABSOLUTE),
     screenJoystickIndex_(M_MAX_UNSIGNED),
     screenJoystickSettingsIndex_(M_MAX_UNSIGNED),
-    paused_(false)
+    paused_(false),
+    vrInitialized_(false)
 {
 }
 
@@ -102,12 +103,14 @@ void Sample::Start()
 #if defined(URHO3D_VR)
     // Register VR subsystem
     context_->RegisterSubsystem(new VR(context_));
+    // Subscribe begin frame event
+    SubscribeToEvent(E_BEGINFRAME, URHO3D_HANDLER(Sample, HandleBeginFrame));
     // Subscribe VR device connected event
     SubscribeToEvent(E_VRDEVICECONNECTED, URHO3D_HANDLER(Sample, HandleVRDeviceConnected));
     // Subscribe VR device disconnected event
     SubscribeToEvent(E_VRDEVICEDISCONNECTED, URHO3D_HANDLER(Sample, HandleVRDeviceDisconnected));
     // Subscribe VR device pose updated for rendering event
-    SubscribeToEvent(E_VRDEVICEPOSEUPDATEDFORRENDERING, URHO3D_HANDLER(Sample, HandleVRDevicePoseUpdatedForRendering));
+    SubscribeToEvent(E_VRDEVICEPOSESUPDATEDFORRENDERING, URHO3D_HANDLER(Sample, HandleVRDevicePosesUpdatedForRendering));
     // Subscribe end rendering event
     SubscribeToEvent(E_ENDRENDERING, URHO3D_HANDLER(Sample, HandleEndRendering));
 #endif
@@ -232,52 +235,63 @@ void Sample::CreateConsoleAndDebugHud()
     debugHud->SetDefaultStyle(xmlFile);
 }
 
-void Sample::CreateHMDNodeAndTextures(float nearClip, float farClip, RenderPath* renderPath)
+bool Sample::TryCreateHMDNodeAndTextures()
 {
 #if defined(URHO3D_VR)
-    VR* vr = GetSubsystem<VR>();
+    Renderer* const renderer = GetSubsystem<Renderer>();
+    VR* const vr = GetSubsystem<VR>();
 
-    unsigned textureWidth, textureHeight;
-    vr->GetRecommendedRenderTargetSize(textureWidth, textureHeight);
-
-    HMDNode_ = new Node(context_);
-
-    for (int eye = 0; eye < 2; ++eye)
+    if (renderer && vr && scene_ && cameraNode_)
     {
-        // Create texture
-        cameraTextures_[eye] = new Texture2D(context_);
-        cameraTextures_[eye]->SetSize(textureWidth, textureHeight, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
-        cameraTextures_[eye]->SetFilterMode(FILTER_BILINEAR);
+        Camera* camera = cameraNode_->GetComponent<Camera>();
+        worldFromVR_ = Matrix3x4(cameraNode_->GetPosition(), Quaternion::IDENTITY, 1.0f);
 
-        // Set render surface to always update
-        RenderSurface* surface = cameraTextures_[eye]->GetRenderSurface();
-        surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
+        unsigned textureWidth, textureHeight;
+        vr->GetRecommendedRenderTargetSize(textureWidth, textureHeight);
 
-        // Create camera node
-        Node* cameraNode = HMDNode_->CreateChild(0 == eye ? "LeftEye" : "RightEye");
+        HMDNode_ = new Node(context_);
+
+        for (int eye = 0; eye < 2; ++eye)
         {
-            Matrix3x4 headFromEye;
-            vr->GetHeadFromEyeTransform(VREye(eye), headFromEye);
+            // Create texture
+            cameraTextures_[eye] = new Texture2D(context_);
+            cameraTextures_[eye]->SetSize(textureWidth, textureHeight, Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+            cameraTextures_[eye]->SetFilterMode(FILTER_BILINEAR);
 
-            cameraNode->SetTransform(headFromEye);
+            // Set render surface to always update
+            RenderSurface* surface = cameraTextures_[eye]->GetRenderSurface();
+            surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
 
-            // Create camera component
-            Camera* eyeCamera = cameraNode->CreateComponent<Camera>();
+            // Create camera node
+            Node* cameraNode = HMDNode_->CreateChild(0 == eye ? "LeftEye" : "RightEye");
             {
-                Matrix4 proj;
-                vr->GetEyeProjection(VREye(eye), nearClip, farClip, proj);
-                eyeCamera->SetProjection(proj);
+                Matrix3x4 headFromEye;
+                vr->GetHeadFromEyeTransform(VREye(eye), headFromEye);
 
-                // Set scene camera viewport
-                SharedPtr<Viewport> eyeViewport(new Viewport(context_, scene_, eyeCamera));
+                cameraNode->SetTransform(headFromEye);
 
-                // Set viewport render path
-                eyeViewport->SetRenderPath(renderPath);
+                // Create camera component
+                Camera* eyeCamera = cameraNode->CreateComponent<Camera>();
+                {
+                    Matrix4 proj;
+                    vr->GetEyeProjection(VREye(eye), camera->GetNearClip(), camera->GetFarClip(), proj);
+                    eyeCamera->SetProjection(proj);
 
-                surface->SetViewport(0, eyeViewport);
+                    // Set scene camera viewport
+                    SharedPtr<Viewport> eyeViewport(new Viewport(context_, scene_, eyeCamera));
+
+                    // Set viewport render path
+                    eyeViewport->SetRenderPath(renderer->GetViewport(0)->GetRenderPath());
+
+                    surface->SetViewport(0, eyeViewport);
+                }
             }
         }
+
+        return true;
     }
+
+    return false;
 #endif
 }
 
@@ -291,6 +305,45 @@ void Sample::DestroyHMDNodeAndTextures()
         cameraTextures_[eye] = 0;
     }
 #endif
+}
+
+void Sample::CreateControllerNode(unsigned deviceId, VRControllerRole controllerRole)
+{
+    char const *const controllerName = 
+        (controllerRole == VRCONTROLLER_LEFTHAND) ? "VRLeftController" : 
+        ((controllerRole == VRCONTROLLER_RIGHTHAND) ? "VRRightController" : "VRController");
+
+    Node* controllerNode = scene_->CreateChild(controllerName);
+    {
+        Node* VRControllerModelNode = controllerNode->CreateChild();
+        VRControllerModelNode->SetScale(0.1f);
+
+        StaticModel* controllerModel = VRControllerModelNode->CreateComponent<StaticModel>();
+        {
+            ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+            controllerModel->SetModel(cache->GetResource<Model>("Models/Editor/Axes.mdl"));
+
+            controllerModel->SetMaterial(0, cache->GetResource<Material>("Materials/Editor/RedUnlit.xml"));
+            controllerModel->SetMaterial(1, cache->GetResource<Material>("Materials/Editor/GreenUnlit.xml"));
+            controllerModel->SetMaterial(2, cache->GetResource<Material>("Materials/Editor/BlueUnlit.xml"));
+        }
+    }
+
+    VRControllerNodeFromDeviceId_[deviceId] = controllerNode;
+}
+
+void Sample::DestroyControllerNode(unsigned deviceId)
+{
+    if (VRControllerNodeFromDeviceId_.Contains(deviceId))
+    {
+        Node* controllerNode = VRControllerNodeFromDeviceId_[deviceId].Get();
+        if (controllerNode)
+        {
+            controllerNode->Remove();
+        }
+        VRControllerNodeFromDeviceId_.Erase(deviceId);
+    }
 }
 
 void Sample::HandleKeyUp(StringHash /*eventType*/, VariantMap& eventData)
@@ -491,50 +544,49 @@ void Sample::HandleMouseModeChange(StringHash /*eventType*/, VariantMap& eventDa
     input->SetMouseVisible(!mouseLocked);
 }
 
+void Sample::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
+{
+#if defined(URHO3D_VR)
+    if (!vrInitialized_)
+    {
+        VR* const vr = GetSubsystem<VR>();
+
+        for (unsigned i = 0; i < vr->GetNumDevices(); ++i)
+        {
+            VRDeviceClass const deviceClass = vr->GetDeviceClass(i);
+
+            switch (deviceClass)
+            {
+            case VRDEVICE_HMD:
+                TryCreateHMDNodeAndTextures();
+                break;
+
+            case VRDEVICE_CONTROLLER:
+                CreateControllerNode(vr->GetDeviceId(i), vr->GetControllerRole(vr->GetControllerRole(i)));
+                break;
+            }
+        }
+
+        vrInitialized_ = true;
+    }
+#endif
+}
+
 void Sample::HandleVRDeviceConnected(StringHash eventType, VariantMap& eventData)
 {
 #if defined(URHO3D_VR)
     using namespace VRDeviceConnected;
 
-    const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
+    const VRDeviceClass deviceClass = VRDeviceClass(eventData[P_DEVICECLASS].GetInt());
 
-    switch (deviceType)
+    switch (deviceClass)
     {
     case VRDEVICE_HMD:
-        if (scene_ && cameraNode_)
-        {
-            Camera* camera = cameraNode_->GetComponent<Camera>();
-            if (camera)
-            {
-                Renderer* renderer = GetSubsystem<Renderer>();
-                CreateHMDNodeAndTextures(camera->GetNearClip(), camera->GetFarClip(), renderer->GetViewport(0)->GetRenderPath());
-
-                worldFromVR_ = Matrix3x4(cameraNode_->GetPosition(), Quaternion::IDENTITY, 1.0f);
-            }
-        }
+        TryCreateHMDNodeAndTextures();
         break;
 
-    case VRDEVICE_CONTROLLER_LEFT:
-    case VRDEVICE_CONTROLLER_RIGHT:
-        {
-            const int controllerIndex = (deviceType - VRDEVICE_CONTROLLER_LEFT);
-            VRControllerNode_[controllerIndex] = 
-                scene_->CreateChild(deviceType == VRDEVICE_CONTROLLER_LEFT ? "VRLeftController" : "VRRightController");
-
-            Node* VRControllerModelNode = VRControllerNode_[controllerIndex]->CreateChild();
-            VRControllerModelNode->SetScale(0.1f);
-
-            StaticModel* controllerModel = VRControllerModelNode->CreateComponent<StaticModel>();
-            {
-                ResourceCache* cache = GetSubsystem<ResourceCache>();
-
-                controllerModel->SetModel(cache->GetResource<Model>("Models/Editor/Axes.mdl"));
-
-                controllerModel->SetMaterial(0, cache->GetResource<Material>("Materials/Editor/RedUnlit.xml"));
-                controllerModel->SetMaterial(1, cache->GetResource<Material>("Materials/Editor/GreenUnlit.xml"));
-                controllerModel->SetMaterial(2, cache->GetResource<Material>("Materials/Editor/BlueUnlit.xml"));
-            }
-        }
+    case VRDEVICE_CONTROLLER:
+        CreateControllerNode(eventData[P_DEVICEID].GetInt(), VRControllerRole(eventData[P_CONTROLLERROLE].GetInt()));
         break;
     }
 #endif
@@ -545,59 +597,52 @@ void Sample::HandleVRDeviceDisconnected(StringHash eventType, VariantMap& eventD
 #if defined(URHO3D_VR)
     using namespace VRDeviceDisconnected;
 
-    const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
+    const VRDeviceClass deviceClass = VRDeviceClass(eventData[P_DEVICECLASS].GetInt());
 
-    switch (deviceType)
+    switch (deviceClass)
     {
     case VRDEVICE_HMD:
         DestroyHMDNodeAndTextures();
         break;
 
-    case VRDEVICE_CONTROLLER_LEFT:
-    case VRDEVICE_CONTROLLER_RIGHT:
-        {
-            const int controllerIndex = (deviceType - VRDEVICE_CONTROLLER_LEFT);
-
-            if (VRControllerNode_[controllerIndex])
-            {
-                VRControllerNode_[controllerIndex]->Remove();
-                VRControllerNode_[controllerIndex] = 0;
-            }
-        }
+    case VRDEVICE_CONTROLLER:
+        DestroyControllerNode(eventData[P_DEVICEID].GetInt());
         break;
     }
 #endif
 }
 
-void Sample::HandleVRDevicePoseUpdatedForRendering(StringHash eventType, VariantMap& eventData)
+void Sample::HandleVRDevicePosesUpdatedForRendering(StringHash eventType, VariantMap& eventData)
 {
 #if defined(URHO3D_VR)
-    using namespace VRDevicePoseUpdatedForRendering;
+    using namespace VRDevicePosesUpdatedForRendering;
 
-    const VRDeviceType deviceType = VRDeviceType(eventData[P_DEVICETYPE].GetInt());
+    VR* const vr = GetSubsystem<VR>();
 
-    switch (deviceType)
+    for (unsigned i = 0; i < vr->GetNumDevices(); ++i)
     {
-    case VRDEVICE_HMD:
-        if(HMDNode_)
-        {
-            VR* vr = GetSubsystem<VR>();
-            HMDNode_->SetTransform(worldFromVR_ * vr->GetTrackingFromDeviceTransform(deviceType));
-        }
-        break;
+        const VRDeviceClass deviceClass = vr->GetDeviceClass(i);
 
-    case VRDEVICE_CONTROLLER_LEFT:
-    case VRDEVICE_CONTROLLER_RIGHT:
+        switch (deviceClass)
         {
-            const int controllerIndex = (deviceType - VRDEVICE_CONTROLLER_LEFT);
-
-            if (VRControllerNode_[controllerIndex])
+        case VRDEVICE_HMD:
+            if (HMDNode_)
             {
-                VR* vr = GetSubsystem<VR>();
-                VRControllerNode_[controllerIndex]->SetTransform(worldFromVR_ * vr->GetTrackingFromDeviceTransform(deviceType));
+                HMDNode_->SetTransform(worldFromVR_ * vr->GetTrackingFromDeviceTransform(i));
             }
+            break;
+
+        case VRDEVICE_CONTROLLER:
+            if (VRControllerNodeFromDeviceId_.Contains(vr->GetDeviceId(i)))
+            {
+                Node* controllerNode = VRControllerNodeFromDeviceId_[vr->GetDeviceId(i)];
+                if (controllerNode)
+                {
+                    controllerNode->SetTransform(worldFromVR_ * vr->GetTrackingFromDeviceTransform(i));
+                }
+            }
+            break;
         }
-        break;
     }
 #endif
 }
@@ -605,7 +650,7 @@ void Sample::HandleVRDevicePoseUpdatedForRendering(StringHash eventType, Variant
 void Sample::HandleEndRendering(StringHash eventType, VariantMap& eventData)
 {
 #if defined(URHO3D_VR)
-    VR* vr = GetSubsystem<VR>();
+    VR* const vr = GetSubsystem<VR>();
 
     for (int eye = 0; eye < 2; ++eye)
     {
