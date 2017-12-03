@@ -562,7 +562,7 @@ void Sample::HandleBeginFrame(StringHash eventType, VariantMap& eventData)
                 break;
 
             case VRDEVICE_CONTROLLER:
-                CreateControllerNode(vr->GetDeviceId(i), vr->GetControllerRole(vr->GetControllerRole(i)));
+                CreateControllerNode(vr->GetDeviceId(i), vr->GetControllerRole(i));
                 break;
             }
         }

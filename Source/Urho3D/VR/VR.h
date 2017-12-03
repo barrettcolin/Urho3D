@@ -87,7 +87,9 @@ public:
 
 protected:
 
-    void SendDeviceConnectedEvent(StringHash eventType, unsigned deviceId, VRDeviceClass deviceClass, VRControllerRole controllerRole);
+    void SendDeviceConnectedEvent(unsigned deviceId, VRDeviceClass deviceClass, VRControllerRole controllerRole);
+
+    void SendDeviceDisconnectedEvent(unsigned deviceId, VRDeviceClass deviceClass, VRControllerRole controllerRole);
 
 private:
 

@@ -19,10 +19,10 @@ class URHO3D_API VRImpl
     friend class VR;
 
 public:
-    /// DeviceTrackingData
-    struct DeviceTrackingData
+    /// DeviceData
+    struct DeviceData
     {
-        vr::TrackedDeviceIndex_t deviceIndex_;
+        vr::TrackedDeviceIndex_t openVRDeviceIndex_;
         vr::ETrackedDeviceClass deviceClass_;
         vr::ETrackedControllerRole controllerRole_;
         vr::VRControllerState001_t controllerState_;
@@ -30,7 +30,7 @@ public:
         bool poseValid_;
 
         /// Construct
-        DeviceTrackingData(vr::TrackedDeviceIndex_t deviceIndex = vr::k_unTrackedDeviceIndexInvalid, 
+        DeviceData(vr::TrackedDeviceIndex_t deviceIndex = vr::k_unTrackedDeviceIndexInvalid, 
             vr::ETrackedDeviceClass deviceClass = vr::TrackedDeviceClass_Invalid, 
             vr::ETrackedControllerRole controllerRole = vr::TrackedControllerRole_Invalid);
     };
@@ -40,12 +40,22 @@ public:
     VRImpl();
     /// Destruct.
     ~VRImpl();
+    /// Is OpenVR initialized?
+    inline bool IsInitialized() const;
+    /// Activate device at OpenVR index, returning newly allocated implementation index
+    unsigned ActivateDevice(vr::TrackedDeviceIndex_t deviceIndex);
+    /// Deactivate device at OpenVR index
+    void DeactivateDevice(vr::TrackedDeviceIndex_t deviceIndex);
+    /// Get number of devices
+    inline unsigned GetNumDevices() const;
+    /// Get device at index
+    inline DeviceData const& GetDevice(unsigned index) const;
+    /// Access device at index
+    inline DeviceData& AccessDevice(unsigned index);
+    /// Get impl index for device at OpenVR index (returns false if the OpenVR device isn't connected)
+    inline bool GetIndexForOpenVRDevice(vr::TrackedDeviceIndex_t deviceIndex, unsigned& implIndexOut) const;
 
 public:
-
-    int ActivateDevice(vr::TrackedDeviceIndex_t deviceIndex);
-
-    void DeactivateDevice(vr::TrackedDeviceIndex_t deviceIndex);
     /// Convert OpenVR pose transform to Urho
     static void UrhoAffineTransformFromOpenVR(vr::HmdMatrix34_t const& in, Matrix3x4& out);
     /// Convert OpenVR eye projection to Urho
@@ -57,9 +67,42 @@ private:
     /// OpenVR VRSystem interface
     vr::IVRSystem* vrSystem_;
 
-    Vector<DeviceTrackingData> deviceTrackingData_;
+    Vector<DeviceData> deviceData_;
 
-    HashMap<vr::TrackedDeviceIndex_t, int> implIndexFromTrackedDeviceIndex_;
+    bool trackedDeviceConnected_[vr::k_unMaxTrackedDeviceCount];
+
+    unsigned implIndexFromTrackedDeviceIndex_[vr::k_unMaxTrackedDeviceCount];
 };
+
+inline bool VRImpl::IsInitialized() const
+{
+    return vrSystem_ != 0;
+}
+
+inline unsigned VRImpl::GetNumDevices() const
+{
+    return deviceData_.Size();
+}
+
+inline VRImpl::DeviceData const& VRImpl::GetDevice(unsigned index) const
+{
+    return deviceData_[index];
+}
+
+inline VRImpl::DeviceData& VRImpl::AccessDevice(unsigned index)
+{
+    return deviceData_[index];
+}
+
+inline bool VRImpl::GetIndexForOpenVRDevice(vr::TrackedDeviceIndex_t deviceIndex, unsigned& implIndexOut) const
+{
+    assert(deviceIndex >= 0 && deviceIndex < vr::k_unMaxTrackedDeviceCount);
+    if (trackedDeviceConnected_[deviceIndex])
+    {
+        implIndexOut = implIndexFromTrackedDeviceIndex_[deviceIndex];
+        return true;
+    }
+    return false;
+}
 
 }

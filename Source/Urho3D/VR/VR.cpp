@@ -16,8 +16,10 @@
 namespace Urho3D
 {
 
-void VR::SendDeviceConnectedEvent(StringHash eventType, unsigned deviceId, VRDeviceClass deviceClass, VRControllerRole controllerRole)
+void VR::SendDeviceConnectedEvent(unsigned deviceId, VRDeviceClass deviceClass, VRControllerRole controllerRole)
 {
+    URHO3D_LOGINFOF("VRDeviceConnected with device %d, class %d, controllerRole %d", deviceId, deviceClass, controllerRole);
+
     using namespace VRDeviceConnected;
 
     VariantMap& eventData = GetEventDataMap();
@@ -26,7 +28,22 @@ void VR::SendDeviceConnectedEvent(StringHash eventType, unsigned deviceId, VRDev
     eventData[P_DEVICECLASS] = deviceClass;
     eventData[P_CONTROLLERROLE] = controllerRole;
 
-    SendEvent(eventType, eventData);
+    SendEvent(E_VRDEVICECONNECTED, eventData);
+}
+
+void VR::SendDeviceDisconnectedEvent(unsigned deviceId, VRDeviceClass deviceClass, VRControllerRole controllerRole)
+{
+    URHO3D_LOGINFOF("VRDeviceDisconnected with device %d, class %d, controllerRole %d", deviceId, deviceClass, controllerRole);
+
+    using namespace VRDeviceDisconnected;
+
+    VariantMap& eventData = GetEventDataMap();
+
+    eventData[P_DEVICEID] = deviceId;
+    eventData[P_DEVICECLASS] = deviceClass;
+    eventData[P_CONTROLLERROLE] = controllerRole;
+
+    SendEvent(E_VRDEVICEDISCONNECTED, eventData);
 }
 
 }

@@ -9,10 +9,10 @@
 namespace Urho3D
 {
 
-VRImpl::DeviceTrackingData::DeviceTrackingData(vr::TrackedDeviceIndex_t deviceIndex, 
+VRImpl::DeviceData::DeviceData(vr::TrackedDeviceIndex_t deviceIndex,
     vr::ETrackedDeviceClass deviceClass, 
     vr::ETrackedControllerRole controllerRole)
-    : deviceIndex_(deviceIndex),
+    : openVRDeviceIndex_(deviceIndex),
     deviceClass_(deviceClass),
     controllerRole_(controllerRole),
     poseValid_(false)
@@ -23,6 +23,8 @@ VRImpl::DeviceTrackingData::DeviceTrackingData(vr::TrackedDeviceIndex_t deviceIn
 VRImpl::VRImpl()
     : vrSystem_(0)
 {
+    for (int i = 0; i < vr::k_unMaxTrackedDeviceCount; ++i)
+        trackedDeviceConnected_[i] = false;
 }
 
 VRImpl::~VRImpl()
@@ -49,10 +51,12 @@ int VRImpl::Initialize()
 
             if (isHMDOrController && vrSystem_->IsTrackedDeviceConnected(dev))
             {
-                int const implIndex = deviceTrackingData_.Size();
+                trackedDeviceConnected_[dev] = true;
+
+                int const implIndex = deviceData_.Size();
                 vr::ETrackedControllerRole const controllerRole = vrSystem_->GetControllerRoleForTrackedDeviceIndex(dev);
 
-                deviceTrackingData_.Push(DeviceTrackingData(dev, deviceClass, controllerRole));
+                deviceData_.Push(DeviceData(dev, deviceClass, controllerRole));
 
                 implIndexFromTrackedDeviceIndex_[dev] = implIndex;
             }
@@ -62,13 +66,14 @@ int VRImpl::Initialize()
     return err;
 }
 
-int VRImpl::ActivateDevice(vr::TrackedDeviceIndex_t deviceIndex)
+unsigned VRImpl::ActivateDevice(vr::TrackedDeviceIndex_t deviceIndex)
 {
-    int const implIndex = deviceTrackingData_.Size();
-    URHO3D_LOGINFOF("ActivateDevice deviceIndex %d with implIndex %d", deviceIndex, implIndex);
+    trackedDeviceConnected_[deviceIndex] = true;
+
+    unsigned const implIndex = deviceData_.Size();
 
     vr::ETrackedControllerRole const controllerRole = vrSystem_->GetControllerRoleForTrackedDeviceIndex(deviceIndex);
-    deviceTrackingData_.Push(DeviceTrackingData(deviceIndex, vrSystem_->GetTrackedDeviceClass(deviceIndex), controllerRole));
+    deviceData_.Push(DeviceData(deviceIndex, vrSystem_->GetTrackedDeviceClass(deviceIndex), controllerRole));
 
     implIndexFromTrackedDeviceIndex_[deviceIndex] = implIndex;
 
@@ -77,20 +82,17 @@ int VRImpl::ActivateDevice(vr::TrackedDeviceIndex_t deviceIndex)
 
 void VRImpl::DeactivateDevice(vr::TrackedDeviceIndex_t deviceIndex)
 {
-    int const implIndex = implIndexFromTrackedDeviceIndex_[deviceIndex];
-    URHO3D_LOGINFOF("DeactivateDevice deviceIndex %d with implIndex %d", deviceIndex, implIndex);
+    unsigned const implIndex = implIndexFromTrackedDeviceIndex_[deviceIndex];
 
-    bool const isLast = (implIndex == deviceTrackingData_.Size() - 1);
-    deviceTrackingData_.EraseSwap(implIndex);
+    deviceData_.EraseSwap(implIndex);
 
-    implIndexFromTrackedDeviceIndex_.Erase(deviceIndex);
-
-    if (!isLast)
+    if (implIndex < deviceData_.Size())
     {
-        // Moved a devicedata so need to update the implindex map
-        vr::TrackedDeviceIndex_t const newDeviceAtImplIndex = deviceTrackingData_[implIndex].deviceIndex_;
-        implIndexFromTrackedDeviceIndex_[newDeviceAtImplIndex] = implIndex;
+        // Swapped a DeviceData so update so update the map to the new index
+        implIndexFromTrackedDeviceIndex_[deviceData_[implIndex].openVRDeviceIndex_] = implIndex;
     }
+
+    trackedDeviceConnected_[deviceIndex] = false;
 }
 
 // Urho scene transforms are X-right/Y-up/Z-forward, OpenVR poses are X-right/Y-up/Z-backward
