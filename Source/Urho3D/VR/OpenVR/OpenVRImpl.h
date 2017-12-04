@@ -16,8 +16,6 @@ template<class K, class V> class HashMap;
 /// %VR implementation. Holds API-specific objects.
 class URHO3D_API VRImpl
 {
-    friend class VR;
-
 public:
     /// DeviceData
     struct DeviceData
@@ -40,6 +38,8 @@ public:
     VRImpl();
     /// Destruct.
     ~VRImpl();
+    /// Initialize
+    int Initialize();
     /// Is OpenVR initialized?
     inline bool IsInitialized() const;
     /// Activate device at OpenVR index, returning newly allocated implementation index
@@ -61,11 +61,11 @@ public:
     /// Convert OpenVR eye projection to Urho
     static void UrhoProjectionFromOpenVR(vr::HmdMatrix44_t const& in, Matrix4& out);
 
-private:
-    int Initialize();
-
+public:
     /// OpenVR VRSystem interface
     vr::IVRSystem* vrSystem_;
+
+private:
 
     Vector<DeviceData> deviceData_;
 
