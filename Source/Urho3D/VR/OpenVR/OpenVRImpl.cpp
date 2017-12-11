@@ -20,11 +20,22 @@ VRImpl::DeviceData::DeviceData(vr::TrackedDeviceIndex_t deviceIndex,
     memset(&controllerState_, 0, sizeof controllerState_);
 }
 
+void VRImpl::DeviceData::SetClassAndControllerRole(vr::ETrackedDeviceClass deviceClass, vr::ETrackedControllerRole controllerRole)
+{
+    deviceClass_ = deviceClass;
+    controllerRole_ = controllerRole;
+}
+
 VRImpl::VRImpl()
-    : vrSystem_(0)
+    : vrSystem_(0),
+    numConnectedDevices_(0)
 {
     for (int i = 0; i < vr::k_unMaxTrackedDeviceCount; ++i)
+    {
+        deviceData_[i].openVRDeviceIndex_ = vr::k_unTrackedDeviceIndexInvalid;
         trackedDeviceConnected_[i] = false;
+        connectedDeviceIndexFromTrackedDeviceIndex_[i] = vr::k_unTrackedDeviceIndexInvalid;
+    }
 }
 
 VRImpl::~VRImpl()
@@ -53,12 +64,12 @@ int VRImpl::Initialize()
             {
                 trackedDeviceConnected_[dev] = true;
 
-                int const implIndex = deviceData_.Size();
-                vr::ETrackedControllerRole const controllerRole = vrSystem_->GetControllerRoleForTrackedDeviceIndex(dev);
+                unsigned const connectedDeviceIndex = numConnectedDevices_++;
+                
+                deviceData_[connectedDeviceIndex].openVRDeviceIndex_ = dev;
+                deviceData_[connectedDeviceIndex].SetClassAndControllerRole(deviceClass, vrSystem_->GetControllerRoleForTrackedDeviceIndex(dev));
 
-                deviceData_.Push(DeviceData(dev, deviceClass, controllerRole));
-
-                implIndexFromTrackedDeviceIndex_[dev] = implIndex;
+                connectedDeviceIndexFromTrackedDeviceIndex_[dev] = connectedDeviceIndex;
             }
         }
     }
@@ -70,27 +81,35 @@ unsigned VRImpl::ActivateDevice(vr::TrackedDeviceIndex_t deviceIndex)
 {
     trackedDeviceConnected_[deviceIndex] = true;
 
-    unsigned const implIndex = deviceData_.Size();
+    unsigned const connectedDeviceIndex = numConnectedDevices_++;
 
-    vr::ETrackedControllerRole const controllerRole = vrSystem_->GetControllerRoleForTrackedDeviceIndex(deviceIndex);
-    deviceData_.Push(DeviceData(deviceIndex, vrSystem_->GetTrackedDeviceClass(deviceIndex), controllerRole));
+    vr::ETrackedDeviceClass const deviceClass = vrSystem_->GetTrackedDeviceClass(deviceIndex);
 
-    implIndexFromTrackedDeviceIndex_[deviceIndex] = implIndex;
+    bool const isController = deviceClass == vr::TrackedDeviceClass_Controller;
+    vr::ETrackedControllerRole const controllerRole = isController ? vrSystem_->GetControllerRoleForTrackedDeviceIndex(deviceIndex) : vr::TrackedControllerRole_Invalid;
 
-    return implIndex;
+    deviceData_[connectedDeviceIndex].openVRDeviceIndex_ = deviceIndex;
+    deviceData_[connectedDeviceIndex].SetClassAndControllerRole(deviceClass, controllerRole);
+
+    connectedDeviceIndexFromTrackedDeviceIndex_[deviceIndex] = connectedDeviceIndex;
+
+    return connectedDeviceIndex;
 }
 
 void VRImpl::DeactivateDevice(vr::TrackedDeviceIndex_t deviceIndex)
 {
-    unsigned const implIndex = implIndexFromTrackedDeviceIndex_[deviceIndex];
+    unsigned const connectedDeviceIndex = connectedDeviceIndexFromTrackedDeviceIndex_[deviceIndex];
 
-    deviceData_.EraseSwap(implIndex);
-
-    if (implIndex < deviceData_.Size())
+    if (numConnectedDevices_ > 1 && connectedDeviceIndex < numConnectedDevices_)
     {
-        // Swapped a DeviceData so update so update the map to the new index
-        implIndexFromTrackedDeviceIndex_[deviceData_[implIndex].openVRDeviceIndex_] = implIndex;
+        DeviceData const& lastData = deviceData_[numConnectedDevices_ - 1];
+
+        deviceData_[connectedDeviceIndex] = lastData;
+
+        connectedDeviceIndexFromTrackedDeviceIndex_[lastData.openVRDeviceIndex_] = connectedDeviceIndex;
     }
+
+    numConnectedDevices_--;
 
     trackedDeviceConnected_[deviceIndex] = false;
 }

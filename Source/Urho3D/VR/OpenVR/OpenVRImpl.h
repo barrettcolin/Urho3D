@@ -31,6 +31,8 @@ public:
         DeviceData(vr::TrackedDeviceIndex_t deviceIndex = vr::k_unTrackedDeviceIndexInvalid, 
             vr::ETrackedDeviceClass deviceClass = vr::TrackedDeviceClass_Invalid, 
             vr::ETrackedControllerRole controllerRole = vr::TrackedControllerRole_Invalid);
+
+        void SetClassAndControllerRole(vr::ETrackedDeviceClass deviceClass, vr::ETrackedControllerRole controllerRole);
     };
 
 public:
@@ -67,11 +69,13 @@ public:
 
 private:
 
-    Vector<DeviceData> deviceData_;
+    unsigned numConnectedDevices_;
+
+    DeviceData deviceData_[vr::k_unMaxTrackedDeviceCount];
 
     bool trackedDeviceConnected_[vr::k_unMaxTrackedDeviceCount];
 
-    unsigned implIndexFromTrackedDeviceIndex_[vr::k_unMaxTrackedDeviceCount];
+    unsigned connectedDeviceIndexFromTrackedDeviceIndex_[vr::k_unMaxTrackedDeviceCount];
 };
 
 inline bool VRImpl::IsInitialized() const
@@ -81,7 +85,7 @@ inline bool VRImpl::IsInitialized() const
 
 inline unsigned VRImpl::GetNumDevices() const
 {
-    return deviceData_.Size();
+    return numConnectedDevices_;
 }
 
 inline VRImpl::DeviceData const& VRImpl::GetDevice(unsigned index) const
@@ -99,7 +103,7 @@ inline bool VRImpl::GetIndexForOpenVRDevice(vr::TrackedDeviceIndex_t deviceIndex
     assert(deviceIndex >= 0 && deviceIndex < vr::k_unMaxTrackedDeviceCount);
     if (trackedDeviceConnected_[deviceIndex])
     {
-        implIndexOut = implIndexFromTrackedDeviceIndex_[deviceIndex];
+        implIndexOut = connectedDeviceIndexFromTrackedDeviceIndex_[deviceIndex];
         return true;
     }
     return false;
