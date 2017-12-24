@@ -290,9 +290,9 @@ bool Sample::TryCreateHMDNodeAndTextures()
 
         return true;
     }
-
-    return false;
 #endif
+
+	return false;
 }
 
 void Sample::DestroyHMDNodeAndTextures()
